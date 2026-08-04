@@ -1,177 +1,346 @@
-"use client";
-import React, { useEffect, useState } from "react";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { SlidersHorizontal, X } from 'lucide-react';
+import { useDebouncedCallback } from 'use-debounce';
+
+import { Checkbox } from './ui/checkbox';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from "@/components/ui/accordion";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+} from '@/components/ui/accordion';
+import { CATEGORIES } from '@/types/categories';
+import { AuctionStatus } from '@repo/db/types';
+import { PHASE_LABELS } from '@/lib/auction';
 
-const Filters = () => {
+/**
+ * Status values are the enum members the database actually stores. The previous
+ * list was `["Active", "Ended", "Inactive"]` in title case, which could not have
+ * matched a row even once the parameters were wired up.
+ */
+const STATUS_OPTIONS = [
+  { value: AuctionStatus.ACTIVE, label: PHASE_LABELS.live },
+  { value: AuctionStatus.INACTIVE, label: PHASE_LABELS.upcoming },
+  { value: AuctionStatus.ENDED, label: PHASE_LABELS.ended },
+] as const;
+
+const readList = (params: URLSearchParams, key: string): string[] => {
+  const raw = params.get(key);
+  return raw ? raw.split(',').filter(Boolean) : [];
+};
+
+const FilterFields = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const param = new URLSearchParams(searchParams);
-  const [status, setStatus] = useState<string[]>([]);
-  const [minPrice, setMinPrice] = useState<number>();
-  const [maxPrice, setMaxPrice] = useState<number>();
 
-  const [categories, setCategories] = useState<string[]>([]);
+  const status = readList(searchParams, 's');
+  const categories = readList(searchParams, 'categories');
 
-  const clearFiltersHandler = () => {
-    setStatus([]);
-    setMinPrice(undefined);
-    setMaxPrice(undefined);
-    setCategories([]);
-    param.delete("s"); // status
-    param.delete("min"); // min pric
-    param.delete("max"); // max price
-    param.delete("categories");
-    router.replace(`${pathname}?${param.toString()}`);
-  };
+  // Only the price inputs hold local state, because they need to stay responsive
+  // while the navigation is debounced. Everything else reads straight from the
+  // URL, which removes the two effects that used to fight each other: one applied
+  // filters on mount, the other hydrated state from the URL on mount, and each
+  // retriggered the other.
+  const [minPrice, setMinPrice] = useState(() => searchParams.get('min') ?? '');
+  const [maxPrice, setMaxPrice] = useState(() => searchParams.get('max') ?? '');
 
   useEffect(() => {
-    applyFiltersHandler();
-  }, [status, categories, minPrice, maxPrice]);
+    setMinPrice(searchParams.get('min') ?? '');
+    setMaxPrice(searchParams.get('max') ?? '');
+  }, [searchParams]);
 
-  useEffect(() => {
-    if (param.get("s")) setStatus(param.get("s")?.split(",") as string[]);
-    if (param.get("categories"))
-      setCategories(param.get("categories")?.split(",") as string[]);
+  /**
+   * Builds the URL from the *current* params inside the handler.
+   *
+   * The old code created `new URLSearchParams(searchParams)` once at render top
+   * level and then mutated that object from inside callbacks -- a stale closure, so
+   * a handler created on one render wrote against a snapshot from that render.
+   */
+  const commit = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      // Any filter change invalidates the current page number; without this you
+      // could apply a narrow filter and land on an empty page 4.
+      params.delete('page');
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
-    if (param.get("min")) setMinPrice(Number(param.get("min")));
-    if (param.get("max")) setMaxPrice(Number(param.get("max")));
-  }, []);
-  const applyFiltersHandler = () => {
-    if (status.length) param.set("s", status.join(","));
-    else param.delete("s");
-    if (minPrice) param.set("min", minPrice.toString());
-    else param.delete("min");
+  const toggleInList = (key: string, value: string) => {
+    commit((params) => {
+      const current = readList(params, key);
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value];
 
-    if (maxPrice) param.set("max", maxPrice.toString());
-    else param.delete("max");
-
-    if (categories.length > 0) param.set("categories", categories.join(","));
-    else param.delete("categories");
-
-    router.replace(`${pathname}?${param.toString()}`);
+      if (next.length > 0) params.set(key, next.join(','));
+      else params.delete(key);
+    });
   };
 
-  const handleCategoryChange = (category: string) => {
-    setCategories((prevCategories) =>
-      prevCategories.includes(category)
-        ? prevCategories.filter((c) => c !== category)
-        : [...prevCategories, category]
-    );
-  };
+  // Each keystroke used to fire a router.replace and a full server round trip.
+  const commitPrice = useDebouncedCallback((key: 'min' | 'max', value: string) => {
+    commit((params) => {
+      if (value === '') params.delete(key);
+      else params.set(key, value);
+    });
+  }, 400);
 
-  const handleStatusChange = (newStatus: string) => {
-    setStatus((prevStaus) =>
-      prevStaus.includes(newStatus)
-        ? prevStaus.filter((s) => s !== newStatus)
-        : [...prevStaus, newStatus]
-    );
+  const onPriceChange = (key: 'min' | 'max', raw: string) => {
+    // Kept as a string rather than passed through Number(): `Number("abc")` is
+    // NaN, and the old `value={minPrice || ""}` meant typing a literal 0 cleared
+    // the field, because 0 is falsy.
+    const digitsOnly = raw.replace(/[^\d]/g, '');
+    if (key === 'min') setMinPrice(digitsOnly);
+    else setMaxPrice(digitsOnly);
+    commitPrice(key, digitsOnly);
   };
 
   return (
-    <div className="bg-muted rounded-lg p-6 space-y-6 dark:bg-card dark:text-card-foreground">
-      <div className="h-full flex flex-col">
-        <div className="flex flex-row justify-between ">
-          <div className="grid items-center">
-            <h3 className="text-lg font-medium mb-2 ">Filters</h3>
-          </div>
-          <button
-            className="text-muted-foreground text-sm"
-            onClick={clearFiltersHandler}
-          >
-            Clear
-          </button>
-        </div>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-1">
-            <AccordionTrigger>Categories</AccordionTrigger>
-            <AccordionContent>
-              <div className="grid gap-2">
-                {[
-                  "Art",
-                  "Collectables",
-                  "Electronics",
-                  "Vehicles",
-                  "Watches",
-                  "Fashion",
-                  "Shoes",
-                ].map((category) => (
-                  <Label
-                    key={category}
-                    className="flex items-center gap-2 font-normal"
-                  >
-                    <Checkbox
-                      checked={categories.includes(category)}
-                      onCheckedChange={() => handleCategoryChange(category)}
-                    />
-                    {category}
-                  </Label>
-                ))}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-2">
-            <AccordionTrigger>Price</AccordionTrigger>
-            <AccordionContent className="flex flex-col gap-2">
-              <div className="flex flex-row gap-2 w-full h-full">
-                <div className="p-1">
-                  <Input
-                    placeholder="Min"
-                    value={minPrice || ""}
-                    onChange={(e) => setMinPrice(Number(e.target.value))}
-                  />
-                </div>
-                <div className="grid items-center">
-                  <div className="text-muted-foreground dark:text-muted-foreground">
-                    -
-                  </div>
-                </div>
-                <div className="p-1">
-                  <Input
-                    placeholder="Max"
-                    value={maxPrice || ""}
-                    onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
-        <Accordion type="single" collapsible>
-          <AccordionItem value="item-4">
-            <AccordionTrigger>Status</AccordionTrigger>
-
-            <AccordionContent className="flex flex-col gap-1">
-              {["Active", "Ended", "Inactive"].map((s) => (
-                <div key={s} className="flex items-center space-x-2">
+    // One Accordion with type="multiple", not three independent single-item
+    // accordions (whose values were item-1, item-2 and item-4 -- item-3 had been
+    // removed at some point).
+    <Accordion
+      type='multiple'
+      defaultValue={['categories', 'price', 'status']}
+      className='w-full'
+    >
+      <AccordionItem value='categories'>
+        <AccordionTrigger className='text-sm'>Category</AccordionTrigger>
+        <AccordionContent>
+          <div className='grid gap-2.5 pt-1'>
+            {/* Was a hardcoded seven-item array inline, one of three divergent
+                category lists in the codebase. */}
+            {CATEGORIES.map((category) => {
+              const id = `category-${category.replace(/\s+/g, '-').toLowerCase()}`;
+              return (
+                <div key={category} className='flex items-center gap-2.5'>
                   <Checkbox
-                    checked={status?.includes(s)}
-                    onCheckedChange={() => handleStatusChange(s)}
+                    id={id}
+                    checked={categories.includes(category)}
+                    onCheckedChange={() => toggleInList('categories', category)}
                   />
-
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    {s}
+                  {/* htmlFor/id: the checkboxes had no label association at all. */}
+                  <label
+                    htmlFor={id}
+                    className='cursor-pointer text-sm leading-none'
+                  >
+                    {category}
                   </label>
                 </div>
-              ))}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </div>
+              );
+            })}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value='price'>
+        <AccordionTrigger className='text-sm'>Price</AccordionTrigger>
+        <AccordionContent>
+          <div className='flex items-center gap-2 pt-1'>
+            <Input
+              aria-label='Minimum price'
+              inputMode='numeric'
+              placeholder='Min'
+              value={minPrice}
+              onChange={(event) => onPriceChange('min', event.target.value)}
+              className='tabular'
+            />
+            <span className='text-muted-foreground'>–</span>
+            <Input
+              aria-label='Maximum price'
+              inputMode='numeric'
+              placeholder='Max'
+              value={maxPrice}
+              onChange={(event) => onPriceChange('max', event.target.value)}
+              className='tabular'
+            />
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value='status' className='border-b-0'>
+        <AccordionTrigger className='text-sm'>Status</AccordionTrigger>
+        <AccordionContent>
+          <div className='grid gap-2.5 pt-1'>
+            {STATUS_OPTIONS.map((option) => {
+              const id = `status-${option.value.toLowerCase()}`;
+              return (
+                <div key={option.value} className='flex items-center gap-2.5'>
+                  <Checkbox
+                    id={id}
+                    checked={status.includes(option.value)}
+                    onCheckedChange={() => toggleInList('s', option.value)}
+                  />
+                  {/* The old <label> carried peer-disabled: classes with no
+                      `peer` sibling anywhere -- dead styling, and no htmlFor. */}
+                  <label
+                    htmlFor={id}
+                    className='cursor-pointer text-sm leading-none'
+                  >
+                    {option.label}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
+};
+
+/** The chips summarising what is currently applied, with per-filter removal. */
+const ActiveFilterChips = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const chips: { key: string; value?: string; label: string }[] = [
+    ...readList(searchParams, 'categories').map((value) => ({
+      key: 'categories',
+      value,
+      label: value,
+    })),
+    ...readList(searchParams, 's').map((value) => ({
+      key: 's',
+      value,
+      label:
+        STATUS_OPTIONS.find((option) => option.value === value)?.label ?? value,
+    })),
+  ];
+
+  const min = searchParams.get('min');
+  const max = searchParams.get('max');
+  if (min || max) {
+    chips.push({
+      key: 'price',
+      label: min && max ? `₹${min} – ₹${max}` : min ? `From ₹${min}` : `Up to ₹${max}`,
+    });
+  }
+
+  if (chips.length === 0) return null;
+
+  const remove = (key: string, value?: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (key === 'price') {
+      params.delete('min');
+      params.delete('max');
+    } else if (value) {
+      const next = readList(params, key).filter((item) => item !== value);
+      if (next.length > 0) params.set(key, next.join(','));
+      else params.delete(key);
+    }
+
+    params.delete('page');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const clearAll = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const key of ['s', 'min', 'max', 'categories', 'page']) {
+      params.delete(key);
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  return (
+    <div className='flex flex-wrap items-center gap-2'>
+      {chips.map((chip) => (
+        <Badge
+          key={`${chip.key}-${chip.value ?? 'range'}`}
+          variant='secondary'
+          className='gap-1 pr-1 font-normal'
+        >
+          {chip.label}
+          <button
+            type='button'
+            onClick={() => remove(chip.key, chip.value)}
+            aria-label={`Remove ${chip.label} filter`}
+            className='rounded-full p-0.5 hover:bg-background/60'
+          >
+            <X className='h-3 w-3' />
+          </button>
+        </Badge>
+      ))}
+      {/* Was a raw <button> with no focus ring and no styling. */}
+      <Button variant='ghost' size='sm' onClick={clearAll} className='h-7 px-2'>
+        Clear all
+      </Button>
     </div>
+  );
+};
+
+const Filters = () => {
+  const searchParams = useSearchParams();
+  const activeCount =
+    readList(searchParams, 'categories').length +
+    readList(searchParams, 's').length +
+    (searchParams.get('min') || searchParams.get('max') ? 1 : 0);
+
+  return (
+    <>
+      {/*
+        Mobile. The panel used to stack above the grid at every width below md,
+        pushing every listing below the fold. It is a sheet now, with the active
+        filter count on the trigger.
+      */}
+      <div className='md:hidden'>
+        <div className='flex items-center gap-2'>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant='outline' size='sm' className='gap-2'>
+                <SlidersHorizontal className='h-4 w-4' />
+                Filters
+                {activeCount > 0 ? (
+                  <Badge className='h-5 min-w-5 justify-center px-1'>
+                    {activeCount}
+                  </Badge>
+                ) : null}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side='left' className='overflow-y-auto'>
+              <SheetHeader>
+                <SheetTitle>Filters</SheetTitle>
+              </SheetHeader>
+              <div className='mt-4'>
+                <FilterFields />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+        <div className='mt-3'>
+          <ActiveFilterChips />
+        </div>
+      </div>
+
+      {/* Desktop sidebar */}
+      <aside className='hidden md:block'>
+        <div className='sticky top-24 space-y-4 rounded-lg border bg-card p-4'>
+          <h2 className='text-sm font-semibold'>
+            Filters
+            {activeCount > 0 ? (
+              <span className='ml-2 font-normal text-muted-foreground'>
+                ({activeCount})
+              </span>
+            ) : null}
+          </h2>
+          <ActiveFilterChips />
+          <FilterFields />
+        </div>
+      </aside>
+    </>
   );
 };
 
