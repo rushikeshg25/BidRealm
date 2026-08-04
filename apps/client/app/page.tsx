@@ -1,5 +1,6 @@
 import { getAuctions } from '@/actions/GetAuctions';
 import Filters from '@/components/Filters';
+import { PageShell } from '@/components/PageShell';
 import Auctions from '@/components/pages/Auctions';
 import PaginationWrapper from '@/components/PaginationWrapper';
 
@@ -24,18 +25,24 @@ export default async function Page({
   const max = searchParams?.max || '';
   const status = searchParams?.s || [];
   const categories = searchParams?.categories || [];
-  const { auctions, totalPages } = await getAuctions({
+  const { auctions, totalCount, totalPages } = await getAuctions({
     offset,
     limit,
     search,
   });
   return (
-    <div className='flex-1 grid grid-cols-1 md:grid-cols-[240px_1fr] gap-3 p-5 dark:bg-background'>
-      <Filters />
-      <div className='flex flex-col gap-5'>
-        <Auctions auctions={auctions} />
-        <PaginationWrapper totalPages={totalPages} />
+    <PageShell width='wide'>
+      <div className='grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]'>
+        <Filters />
+        <div className='flex flex-col gap-6'>
+          <Auctions
+            auctions={auctions}
+            totalCount={totalCount}
+            isFiltered={Boolean(search)}
+          />
+          <PaginationWrapper totalPages={totalPages} />
+        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

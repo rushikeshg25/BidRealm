@@ -15,6 +15,11 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // Auction phase variants, so "live" and "ended" are not hardcoded
+        // emerald/grey classes repeated at every call site.
+        live: "border-transparent bg-live text-live-foreground",
+        ended: "border-transparent bg-ended text-ended-foreground",
+        upcoming: "border-transparent bg-secondary text-secondary-foreground",
       },
     },
     defaultVariants: {
