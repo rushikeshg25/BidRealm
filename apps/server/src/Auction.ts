@@ -1,19 +1,10 @@
-import { db, AuctionStatusHelper } from "./db";
+import { db, AuctionStatus } from "./db";
 import { User } from "./utils/SocketManager";
+import type { BidT } from "@repo/db/types";
 
-export interface bids {
-  amount: number;
-  userId: String;
-  createdAt: Date;
-  auctionId: string;
-}
+export type bids = BidT;
 
-export enum AuctionStatus {
-  ENDED,
-  ACTIVE,
-  INACTIVE,
-  CANCELLED,
-}
+export { AuctionStatus };
 
 export class Auction {
   public auctionId: string;
@@ -108,34 +99,13 @@ export class Auction {
     });
   }
   public async setStatus(status: AuctionStatus) {
-    if (status === AuctionStatus.ENDED) {
-      await db.auction.update({
-        where: {
-          id: this.auctionId,
-        },
-        data: {
-          status: AuctionStatusHelper.ENDED,
-        },
-      });
-    } else if (status === AuctionStatus.ACTIVE) {
-      await db.auction.update({
-        where: {
-          id: this.auctionId,
-        },
-        data: {
-          status: AuctionStatusHelper.ACTIVE,
-        },
-      });
-    } else if (status === AuctionStatus.INACTIVE) {
-      await db.auction.update({
-        where: {
-          id: this.auctionId,
-        },
-        data: {
-          status: AuctionStatusHelper.INACTIVE,
-        },
-      });
-    }
+    // Previously an if/else chain that handled ENDED, ACTIVE and INACTIVE with
+    // three identical update calls and silently dropped CANCELLED, leaving that
+    // transition in memory only.
+    await db.auction.update({
+      where: { id: this.auctionId },
+      data: { status },
+    });
     this.status = status;
   }
   public calculateTimeLeft(): number {

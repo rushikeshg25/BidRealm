@@ -8,44 +8,53 @@ datasource db {
 }
 
 model User {
-  id              String    @id 
-  sessions        Session[]
-  userName        String    @unique
-  email           String    @unique
-  hashedPassword  String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  auctions        Auction[]
-  bids            Bid[]
+  id             String    @id
+  sessions       Session[]
+  userName       String    @unique
+  email          String    @unique
+  hashedPassword String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  auctions       Auction[]
+  bids           Bid[]
 }
 
 model Auction {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   title         String
   description   String
   startingPrice Int
   currentPrice  Int
   startDate     DateTime
   endDate       DateTime
-  status        AuctionStatus
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  status        AuctionStatus @default(INACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   bids          Bid[]
   image         String
   categories    String
+
+  @@index([userId])
+  @@index([status])
+  @@index([endDate])
+  @@index([categories])
 }
 
 model Bid {
-  id        String      @id @default(cuid())
-  amount    Float
+  id        String   @id @default(cuid())
+  amount    Int
   createdAt DateTime @default(now())
   userId    String
   auctionId String
-  
-  user      User     @relation(fields: [userId], references: [id])
-  auction   Auction  @relation(fields: [auctionId], references: [id])
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId, amount])
+  @@index([auctionId, createdAt])
+  @@index([userId])
 }
 
 model Session {
@@ -53,9 +62,9 @@ model Session {
   expiresAt DateTime
   userId    String
   user      User     @relation(references: [id], fields: [userId], onDelete: Cascade)
+
+  @@index([userId])
 }
-
-
 
 enum AuctionStatus {
   INACTIVE

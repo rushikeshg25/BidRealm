@@ -1,7 +1,5 @@
 import { Bid, Auction, AuctionStatus, User, Prisma } from '@prisma/client';
 
-import prisma from './index';
-
 export type BidT = Bid;
 export type AuctionT = Auction;
 export type AuctionStatusT = AuctionStatus;
@@ -55,5 +53,14 @@ export type BidsWithUser = Prisma.BidGetPayload<{
   };
 }>;
 
-export const AuctionStatusHelper = AuctionStatus;
-export const AuctionStatusHelperT = AuctionStatus;
+/**
+ * The single source of truth for auction status across all apps.
+ *
+ * There used to be three separate hand-rolled enums for this — a numeric one in
+ * the bid server, a differently-ordered numeric one in the client, and this
+ * Prisma re-export. Because Postgres stores the *strings*, comparisons like
+ * `auction.status === AuctionStatus.ACTIVE` were really `"ACTIVE" === 1` and so
+ * were always false, which is why live auctions rejected bids with
+ * "Auction not found".
+ */
+export { AuctionStatus };

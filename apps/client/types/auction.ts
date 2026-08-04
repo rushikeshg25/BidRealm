@@ -1,11 +1,10 @@
 import { z } from 'zod';
 
-export enum AuctionStatus {
-  ACTIVE,
-  ENDED,
-  CANCELLED,
-  INACTIVE,
-}
+// AuctionStatus is not redeclared here on purpose — import it from
+// `@repo/db/types`, which re-exports the Prisma enum the database actually
+// stores. The numeric enum that used to live here had a different member order
+// again from the bid server's copy, and neither matched the stored strings.
+export { AuctionStatus } from '@repo/db/types';
 
 export const Auctionschema = z
   .object({
@@ -30,35 +29,14 @@ export const Auctionschema = z
 
 export type AuctionT = z.infer<typeof Auctionschema>;
 
-export type bidT = {
-  id: string;
-  amount: number;
-  createdAt: Date;
-  userId: string;
-  auctionId: string;
-};
-
-export type auctionType = {
-  id: string;
-  title: string;
-  description: string;
-  startingPrice: number;
-  currentPrice: number;
-  startDate: Date;
-  endDate: Date;
-  status: 'INACTIVE' | 'ACTIVE ' | 'ENDED';
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  image: string;
-  categories: 'COLLECTABLES' | 'WATCHES' | 'FASHION';
-  bids: bidT[];
-  user: {
-    id: string;
-    userName: string;
-    email: string;
-    hashedPassword: string;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-};
+// `bidT` and `auctionType` used to be hand-maintained mirrors of the Prisma
+// models. Both were unused, both had drifted (`'ACTIVE '` with a trailing space
+// never matched anything, and the category union listed three values that are
+// not among the ones actually stored), and `auctionType.user` declared
+// `hashedPassword` on a type meant for client components. Derive from Prisma
+// instead: see `@repo/db/types`.
+export type {
+  BidT,
+  AuctionT as AuctionRowT,
+  AuctionWithBidsWithUsersAndUserT,
+} from '@repo/db/types';

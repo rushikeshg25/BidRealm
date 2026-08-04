@@ -27,7 +27,7 @@ export class AuctionManager {
         auction?.startDate as Date,
         auction?.endDate as Date,
         auction?.bids as bids[],
-        auction?.status as unknown as AuctionStatus
+        auction?.status as AuctionStatus
       );
       this.auctions.set(user.auctionId, auctionInstance);
     }
