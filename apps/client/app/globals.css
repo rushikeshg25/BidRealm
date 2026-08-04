@@ -2,64 +2,148 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * The palette used to be stock shadcn slate, which is why the app read as an
+ * unstyled template. Three specific problems:
+ *
+ *   --primary was 240 5.9% 10% in light and 0 0% 98% in dark -- near-black and
+ *   near-white. There was no brand hue anywhere, so every CTA, price and
+ *   category pill was greyscale.
+ *
+ *   --card was identical to --background in *both* themes, so Card had no
+ *   elevation at all and every boundary depended solely on a 1px border.
+ *
+ *   --muted, --accent and --secondary were the same value, so bg-accent hover
+ *   states were invisible against a muted panel.
+ *
+ * The direction now is auction house: warm amber on a near-neutral zinc base,
+ * with emerald reserved for "live" and grey for "ended".
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --background: 40 20% 99%;
+    --foreground: 240 10% 8%;
+
+    /* Lifted off the background so cards actually sit above the page. */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 240 10% 8%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 72.22% 50.59%;
+    --popover-foreground: 240 10% 8%;
+
+    /* Amber. Its foreground is near-black: white text on amber fails contrast. */
+    --primary: 38 92% 50%;
+    --primary-foreground: 26 45% 12%;
+
+    --secondary: 40 12% 94%;
+    --secondary-foreground: 240 10% 12%;
+
+    --muted: 40 10% 95.5%;
+    --muted-foreground: 240 4% 42%;
+
+    /* Amber-tinted, and deliberately distinct from --muted so hovers show. */
+    --accent: 38 92% 94%;
+    --accent-foreground: 26 45% 16%;
+
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5% 64.9%;
-    --radius: 0.5rem;
+
+    /* Auction phase colours. */
+    --live: 152 72% 36%;
+    --live-foreground: 0 0% 100%;
+    --ended: 240 4% 46%;
+    --ended-foreground: 0 0% 100%;
+
+    --border: 40 8% 89%;
+    --input: 40 8% 89%;
+    --ring: 38 92% 50%;
+
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 240 6% 7%;
+    --foreground: 40 12% 96%;
+
+    --card: 240 5% 11%;
+    --card-foreground: 40 12% 96%;
+
+    --popover: 240 5% 11%;
+    --popover-foreground: 40 12% 96%;
+
+    /* Slightly lighter in dark so it holds up against the near-black base. */
+    --primary: 38 92% 55%;
+    --primary-foreground: 26 50% 9%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 40 12% 96%;
+
+    --muted: 240 4% 15%;
+    --muted-foreground: 240 5% 62%;
+
+    --accent: 36 30% 20%;
+    --accent-foreground: 38 90% 88%;
+
+    --destructive: 0 65% 46%;
+    --destructive-foreground: 0 0% 98%;
+
+    --live: 152 64% 44%;
+    --live-foreground: 152 90% 8%;
+    --ended: 240 5% 52%;
+    --ended-foreground: 240 10% 8%;
+
+    --border: 240 4% 18%;
+    --input: 240 4% 20%;
+    --ring: 38 92% 55%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  /*
+   * Was `* { @apply border-border }` -- the wildcard applies to every element and
+   * pseudo-element in the document. Scoping it to elements that actually declare
+   * a border style does the same job.
+   */
+  *,
+  ::before,
+  ::after {
+    border-color: hsl(var(--border));
   }
+
   html {
     @apply scroll-smooth;
   }
+
   body {
     @apply bg-background text-foreground;
-    /* font-feature-settings: "rlig" 1, "calt" 1; */
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Amber focus rings, visible on both themes. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  /*
+   * Prices and countdowns re-render every second. Proportional digits change
+   * width as they change value, so the numbers visibly jitter and any layout
+   * beside them reflows. Tabular figures are fixed-width.
+   */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Respect a user's reduced-motion preference for the live pulse and shimmer. */
+  @media (prefers-reduced-motion: reduce) {
+    .motion-safe-only {
+      animation: none !important;
+    }
   }
 }
