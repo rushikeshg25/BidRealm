@@ -45,10 +45,11 @@ export class AuctionManager {
     return this.auctions.has(AuctionId);
   }
 
-  removeHandler(ws: WebSocket, userId: string, auctionId: string) {
-    if (this.auctions.get(auctionId)) {
-      this.auctions.get(auctionId)?.removeUser(userId);
-    }
+  removeHandler(user: User) {
+    // Takes the User rather than (ws, userId, auctionId) so removal can match on
+    // socket identity: a user with two tabs open is two entries, and removing by
+    // userId evicted both.
+    this.auctions.get(user.auctionId)?.removeUser(user);
   }
 
   public updateAuctionStatuses() {

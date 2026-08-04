@@ -1,6 +1,6 @@
 import { db, AuctionStatus } from "./db";
 import { User } from "./utils/SocketManager";
-import type { BidT } from "@repo/db/types";
+import { publicBidSelect, type BidT } from "@repo/db/types";
 
 export type bids = BidT;
 
@@ -38,8 +38,8 @@ export class Auction {
   addUser(user: User) {
     this.users.push(user);
   }
-  removeUser(userId: string) {
-    this.users.filter((user) => user.userId !== userId);
+  removeUser(user: User) {
+    this.users = this.users.filter((candidate) => candidate !== user);
   }
 
   async createBid(amount: number, user: User) {
@@ -56,9 +56,9 @@ export class Auction {
         auctionId: user.auctionId,
         amount: amount,
       },
-      include: {
-        user: true,
-      },
+      // This was `include: { user: true }`, so the broadcast below sent every
+      // participant the bidder's whole User row — hashedPassword and all.
+      select: publicBidSelect,
     });
     await db.auction.update({
       where: {

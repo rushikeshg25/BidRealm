@@ -53,6 +53,7 @@
   "devDependencies": {
     "@repo/db": "*",
     "@repo/env": "*",
+    "@repo/ws-ticket": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^20",
     "@types/react": "^18",

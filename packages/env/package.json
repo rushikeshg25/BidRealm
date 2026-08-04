@@ -1,19 +1,19 @@
 {
   "name": "@repo/env",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "private": true,
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Per-app environment variable schemas.",
   "dependencies": {
     "@t3-oss/env-core": "^0.10.1",
     "zod": "^3.23.8"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./email": "./src/email.ts"
   }
 }

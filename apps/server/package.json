@@ -19,6 +19,7 @@
     "@prisma/client": "5.19.1",
     "@repo/db": "*",
     "@repo/env": "*",
+    "@repo/ws-ticket": "*",
     "@repo/typescript-config": "*",
     "date-and-time": "^3.3.0",
     "express": "^4.19.2",

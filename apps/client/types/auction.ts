@@ -37,6 +37,7 @@ export type AuctionT = z.infer<typeof Auctionschema>;
 // instead: see `@repo/db/types`.
 export type {
   BidT,
+  PublicBidT,
   AuctionT as AuctionRowT,
-  AuctionWithBidsWithUsersAndUserT,
+  AuctionDetailT,
 } from '@repo/db/types';

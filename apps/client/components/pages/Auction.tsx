@@ -7,8 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getSocketTicket } from '@/actions/GetSocketTicket';
 import { bidStore } from '@/zustand/bidStore';
-import { AuctionWithBidsWithUsersAndUserT } from '@repo/db/types';
+import { AuctionDetailT } from '@repo/db/types';
 import date from 'date-and-time';
 import { User } from 'lucia';
 import Image from 'next/image';
@@ -18,7 +19,10 @@ import AuctionTimer from '../AuctionTimer';
 import BidDialog from '../BidDialog';
 import { Button } from '../ui/button';
 
-const WS_URL = process.env.WS_URL ?? 'ws://localhost:8080';
+// Next only inlines NEXT_PUBLIC_* into the browser bundle. This was
+// `process.env.WS_URL`, always undefined client-side, so every deployment fell
+// through to localhost and no user could ever connect to the real bid server.
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8080';
 const formatMoney = (amount: number) => {
   if (amount >= 100000 && amount < 10000000) {
     return `${amount / 1000000}L`;
@@ -34,7 +38,7 @@ const Auction = ({
   auction,
 }: {
   user: User | null;
-  auction: AuctionWithBidsWithUsersAndUserT;
+  auction: AuctionDetailT;
 }) => {
   console.log('start', auction.startDate);
   console.log('startcal', new Date() > new Date(auction.startDate));
@@ -56,24 +60,31 @@ const Auction = ({
   }, [user]);
 
   useEffect(() => {
-    const ws = new WebSocket(
-      `${WS_URL}?userId=${user?.id}&auctionId=${auction.id}`
-    );
+    // Anonymous visitors get no socket at all. The connection URL no longer
+    // carries a `userId` for the server to trust — identity travels in a signed
+    // ticket that only a validated session can mint.
+    if (!user) return;
 
-    ws.onopen = () => {
-      console.log('WebSocket connection opened');
-      setSocket(ws);
-    };
+    let ws: WebSocket | null = null;
+    let cancelled = false;
 
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      setSocket(null);
-    };
+    (async () => {
+      const result = await getSocketTicket(auction.id);
+      if (cancelled) return;
+      if (!result.ok) return;
+
+      ws = new WebSocket(
+        `${WS_URL}?auctionId=${auction.id}&ticket=${encodeURIComponent(result.ticket)}`
+      );
+      ws.onopen = () => setSocket(ws);
+      ws.onclose = () => setSocket(null);
+    })();
 
     return () => {
-      ws.close();
+      cancelled = true;
+      ws?.close();
     };
-  }, [user, auction.id]);
+  }, [user?.id, auction.id]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleModal = () => {

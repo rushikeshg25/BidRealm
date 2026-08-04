@@ -1,0 +1,13 @@
+{
+  "name": "@repo/ws-ticket",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Short-lived signed tickets authorising a websocket connection to one auction.",
+  "license": "ISC",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0"
+  }
+}

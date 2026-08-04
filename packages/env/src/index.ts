@@ -1,43 +1,17 @@
-import { createEnv } from "@t3-oss/env-core";
-import { z } from "zod";
-
-export const env = createEnv({
-  server: {
-    DATABASE_URL: z.string().url(),
-    UPLOADTHING_SECRET: z.string(),
-    UPLOADTHING_APP_ID: z.string(),
-    AUTH_SECRET: z.string(),
-    REDIS_PASSWORD: z.string(),
-    REDIS_HOST: z.string(),
-    REDIS_PORT: z.number(),
-  },
-
-  /**
-   * The prefix that client-side variables must have. This is enforced both at
-   * a type-level and at runtime.
-   */
-  clientPrefix: "PUBLIC_",
-
-  client: {},
-
-  /**
-   * What object holds the environment variables at runtime. This is usually
-   * `process.env` or `import.meta.env`.
-   */
-  runtimeEnv: process.env,
-
-  /**
-   * By default, this library will feed the environment variables directly to
-   * the Zod validator.
-   *
-   * This means that if you have an empty string for a value that is supposed
-   * to be a number (e.g. `PORT=` in a ".env" file), Zod will incorrectly flag
-   * it as a type mismatch violation. Additionally, if you have an empty string
-   * for a value that is supposed to be a string with a default value (e.g.
-   * `DOMAIN=` in an ".env" file), the default value will never be applied.
-   *
-   * In order to solve these issues, we recommend that all new projects
-   * explicitly specify this option as true.
-   */
-  emptyStringAsUndefined: true,
-});
+/**
+ * This package was previously a single `createEnv` call that nothing imported.
+ *
+ * It could not have worked if it had been imported: `REDIS_PORT: z.number()`
+ * validates against `process.env`, whose values are always strings, so it could
+ * only ever fail; and `clientPrefix: "PUBLIC_"` is not the prefix Next inlines
+ * (`NEXT_PUBLIC_`). It also declared every variable in one schema, so the Next
+ * app would have been required to define the email worker's Redis credentials.
+ *
+ * Each app now validates only the variables it actually reads, via its own
+ * export path — importing one does not force the others' schemas to pass.
+ */
+export const ENV_PACKAGE_README = `
+  import { serverEnv } from "@repo/env/server"; // apps/server
+  import { clientEnv } from "@repo/env/client"; // apps/client
+  import { emailEnv } from "@repo/env/email";   // apps/email-notification-server
+`;

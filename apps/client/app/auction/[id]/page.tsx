@@ -1,26 +1,18 @@
 import Auction from '@/components/pages/Auction';
 import { getAuth } from '@/lib/auth';
 import prisma from '@repo/db';
-import { AuctionWithBidsWithUsersAndUserT } from '@repo/db/types';
+import { auctionDetailInclude } from '@repo/db/types';
 import Link from 'next/link';
 
 const page = async ({ params }: { params: { id: string } }) => {
   const { user } = await getAuth();
+  // `include: { bids: { include: { user: true } }, user: true }` serialised every
+  // bidder's and the seller's full User row — hashedPassword included — into the
+  // RSC payload sent to the browser. `auctionDetailInclude` names the visible
+  // fields explicitly instead.
   const auction = await prisma.auction.findUnique({
-    where: {
-      id: params.id,
-    },
-    include: {
-      bids: {
-        include: {
-          user: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      user: true,
-    },
+    where: { id: params.id },
+    include: auctionDetailInclude,
   });
 
   if (!auction)
@@ -36,12 +28,7 @@ const page = async ({ params }: { params: { id: string } }) => {
       </div>
     );
 
-  return (
-    <Auction
-      user={user}
-      auction={auction as AuctionWithBidsWithUsersAndUserT}
-    />
-  );
+  return <Auction user={user} auction={auction} />;
 };
 
 export default page;
