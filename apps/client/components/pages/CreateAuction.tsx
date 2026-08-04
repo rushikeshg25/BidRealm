@@ -1,201 +1,301 @@
-"use client";
+'use client';
 
-import { createAuction } from "@/actions/CreateAuction";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { Loader2 } from 'lucide-react';
+
+import { createAuction } from '@/actions/CreateAuction';
+import { Auctionschema, AuctionT } from '@/types/auction';
+import { CATEGORIES } from '@/types/categories';
+import { PageShell, PageHeader } from '../PageShell';
+import ImageUpload from '../ImageUpload';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import DateTimePickerComponent from '../ui/DateTimePickerComponent';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Auctionschema, AuctionT } from "@/types/auction";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { User } from "lucia";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
-import ImageUpload from "../ImageUpload";
-import { Button } from "../ui/button";
-import DateTimePickerComponent from "../ui/DateTimePickerComponent";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
+} from '@/components/ui/select';
 
-export enum Categories {
-  ART,
-  COLLECTABLES,
-  ELECTRONICS,
-  VEHICLES,
-  WATCHES,
-  FASHION,
-  SHOES,
-}
-const CategoriesArray = [
-  "Art",
-  "Collectables",
-  "Electronics",
-  "Vehicles",
-  "Watches",
-  "Fashion",
-  "Shoes",
-];
+/** A shared field wrapper, so the error styling is defined once. */
+const Field = ({
+  id,
+  label,
+  error,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}) => (
+  <div className='space-y-1.5'>
+    {/* Nearly every label in this form pointed at a nonexistent id: htmlFor="title"
+        with no id on the Input, htmlFor="description" used *twice* (the second for
+        Starting Price), and htmlFor="start-date"/"end-date"/"categories" matching
+        nothing at all. */}
+    <Label htmlFor={id}>{label}</Label>
+    {children}
+    {hint && !error ? (
+      <p className='text-xs text-muted-foreground'>{hint}</p>
+    ) : null}
+    {/* Was `text-red-500` hardcoded in seven places rather than text-destructive. */}
+    {error ? <p className='text-sm text-destructive'>{error}</p> : null}
+  </div>
+);
 
-const CreateAuction = ({ user }: { user: User }) => {
+const CreateAuction = () => {
   const router = useRouter();
-  const [category, setCategory] = useState<string>("");
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
-  const [imgUrl, setImgUrl] = useState<string>("");
-  // The `data` state that used to live here is gone -- react-hook-form already
-  // holds the form's values and hands them to onSubmit. Mirroring them into a
-  // second useState was what created the stale-submit bug.
+  const [imgUrl, setImgUrl] = useState<string>('');
+  const [imageError, setImageError] = useState<string>();
+
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
-    setValue,
   } = useForm<AuctionT>({
     resolver: zodResolver(Auctionschema),
+    defaultValues: { title: '', description: '', Categories: '' },
   });
 
-  const { mutate: server_createAuction } = useMutation({
-    // The payload is an argument now. It used to be read from the `data` state
-    // variable, which onSubmit set with setData() and then immediately submitted
-    // -- but setState is asynchronous, so the closure still held the previous
-    // value and the first submit posted the empty initial state.
+  const { mutate: server_createAuction, isPending } = useMutation({
+    // The payload is an argument. It used to be read from a `data` useState that
+    // onSubmit set with setData() and then immediately submitted -- but setState is
+    // asynchronous, so the closure still held the previous value and the first
+    // submit posted the empty initial state.
     //
-    // `userId` is also gone: it used to be passed from the client, which meant
-    // anyone could create auctions attributed to any user. The action reads it
-    // from the session.
-    mutationFn: async (payload: AuctionT) => {
-      return await createAuction(payload, imgUrl);
-    },
+    // `userId` is gone too: it used to be passed from the client, so anyone could
+    // create auctions attributed to any user. The action reads it from the session.
+    mutationFn: async (payload: AuctionT) => createAuction(payload, imgUrl),
     onSuccess: (result) => {
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success("Auction created successfully!");
-      router.push("/my-auctions");
+      toast.success('Auction created');
+      router.push('/my-auctions');
     },
     onError: () => {
       toast.error("We couldn't create your auction. Please try again.");
     },
   });
 
-  const startDateHandler = (date: Date) => {
-    setStartDate(date);
-    setValue("startDate", date);
-  };
-  const endDateHandler = (date: Date) => {
-    setEndDate(date);
-    setValue("endDate", date);
-  };
-  const ImageURL = (url: string) => {
-    setImgUrl(url);
-  };
-
-  useEffect(() => {
-    setValue("startDate", startDate);
-  }, [startDate]);
-  useEffect(() => {
-    setValue("endDate", endDate);
-  }, [endDate]);
-  useEffect(() => {
-    setValue("Categories", category);
-  }, [category]);
-
   const onSubmit = (data: AuctionT) => {
+    // An empty image used to be accepted here and then crashed the detail page,
+    // where next/image throws on src="". The action rejects it as well.
+    if (!imgUrl) {
+      setImageError('Please upload an image for your auction.');
+      return;
+    }
+    setImageError(undefined);
     server_createAuction(data);
   };
+
   return (
-    <div className="max-w-4xl px-4 py-5 mx-auto mt-10 sm:px-6 lg:px-8 dark:border border rounded-lg mb-10">
-      <h1 className="mb-6 text-3xl font-bold flex items-center justify-center">
-        <>Create New Auction</>
-      </h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 w-full">
-          <div className="grid gap-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input {...register("title")} placeholder="Enter auction title" />
-              {errors.title && (
-                <p className="text-red-500">{errors.title.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register("description")}
-                placeholder="Enter auction description"
-              />
-              {errors.description && (
-                <p className="text-red-500">{errors.description.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="description">Starting Price</Label>
-              <Input
-                type="number"
-                id="startingPrice"
-                onChange={(e) => {
-                  setValue("startingPrice", Number(e.target.value));
-                }}
-                placeholder="Enter starting Bid price"
-              />
-              {errors.startingPrice && (
-                <p className="text-red-500">{errors.startingPrice.message}</p>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="start-date">Start Date & Time</Label>
-                <DateTimePickerComponent Datehandler={startDateHandler} />
-                {errors.startDate && (
-                  <p className="text-red-500">{errors.startDate.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="end-date">End Date & Time</Label>
-                <DateTimePickerComponent Datehandler={endDateHandler} />
-                {errors.endDate && (
-                  <p className="text-red-500">{errors.endDate.message}</p>
-                )}
-              </div>
-            </div>
-            <div className="w-full flex flex-row items-center justify-between">
-              <Label htmlFor="categories">Select Category</Label>
-              <Select onValueChange={(value) => setCategory(value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent className="w-full">
-                  {CategoriesArray.map((category) => (
-                    <SelectItem value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.Categories && (
-                <p className="text-red-500">{errors.Categories.message}</p>
-              )}
-            </div>
+    <PageShell width='default'>
+      <PageHeader
+        title='Create an auction'
+        description='Set a reserve, choose when bidding opens and closes, and publish.'
+      />
+
+      <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+        <div className='grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]'>
+          {/* Was one flat bordered box with `dark:border border` -- redundant, and
+              with no section grouping at all. */}
+          <div className='space-y-6'>
+            <Card>
+              <CardHeader>
+                <CardTitle className='text-base'>Item details</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <Field id='title' label='Title' error={errors.title?.message}>
+                  <Input
+                    id='title'
+                    placeholder='e.g. 1969 Mustang Fastback'
+                    {...register('title')}
+                  />
+                </Field>
+
+                <Field
+                  id='description'
+                  label='Description'
+                  error={errors.description?.message}
+                  hint='What is it, what condition is it in, what is included.'
+                >
+                  <Textarea
+                    id='description'
+                    rows={6}
+                    placeholder='Describe the item'
+                    {...register('description')}
+                  />
+                </Field>
+
+                <Field
+                  id='categories'
+                  label='Category'
+                  error={errors.Categories?.message}
+                >
+                  {/*
+                    Was mirrored into the form with a `useEffect` on a separate
+                    useState -- one of three such effects. Controller is what
+                    react-hook-form provides for non-native inputs.
+                  */}
+                  <Controller
+                    control={control}
+                    name='Categories'
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id='categories'>
+                          <SelectValue placeholder='Choose a category' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* The mapped SelectItem had no `key`. */}
+                          {CATEGORIES.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className='text-base'>Pricing and schedule</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <Field
+                  id='startingPrice'
+                  label='Starting price'
+                  error={errors.startingPrice?.message}
+                  hint='The lowest bid you will accept.'
+                >
+                  <div className='relative'>
+                    <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground'>
+                      ₹
+                    </span>
+                    {/*
+                      Was `onChange={(e) => setValue('startingPrice', Number(...))}`
+                      instead of register, so there was no onBlur and no touched
+                      state. valueAsNumber does the coercion.
+                    */}
+                    <Input
+                      id='startingPrice'
+                      type='number'
+                      min={1}
+                      step={1}
+                      inputMode='numeric'
+                      placeholder='10000'
+                      className='tabular pl-7'
+                      {...register('startingPrice', { valueAsNumber: true })}
+                    />
+                  </div>
+                </Field>
+
+                <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                  <Field
+                    id='start-date'
+                    label='Bidding opens'
+                    error={errors.startDate?.message}
+                  >
+                    <Controller
+                      control={control}
+                      name='startDate'
+                      render={({ field }) => (
+                        <DateTimePickerComponent
+                          id='start-date'
+                          value={field.value}
+                          minDate={new Date()}
+                          Datehandler={field.onChange}
+                        />
+                      )}
+                    />
+                  </Field>
+
+                  <Field
+                    id='end-date'
+                    label='Bidding closes'
+                    error={errors.endDate?.message}
+                  >
+                    <Controller
+                      control={control}
+                      name='endDate'
+                      render={({ field }) => (
+                        <DateTimePickerComponent
+                          id='end-date'
+                          value={field.value}
+                          minDate={new Date()}
+                          Datehandler={field.onChange}
+                        />
+                      )}
+                    />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="grid gap-4 h-full">
-            <div className="flex items-center justify-center h-full">
-              <ImageUpload ImageURL={ImageURL} />
-            </div>
+
+          {/* Was a single centred dropzone in a full-height grid cell, leaving a
+              large empty area beside the form on desktop. */}
+          <div className='lg:sticky lg:top-24 lg:self-start'>
+            <Card>
+              <CardHeader>
+                <CardTitle className='text-base'>Photo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ImageUpload
+                  ImageURL={(url) => {
+                    setImgUrl(url);
+                    if (url) setImageError(undefined);
+                  }}
+                  error={imageError}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
-        <div className="flex justify-center w-full mt-3">
-          <Button type="submit" className="w-1/3">
-            Publish
+
+        <div className='flex justify-end gap-2'>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => router.back()}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+          {/* There was no pending state, so double-clicking Publish created two
+              auctions. */}
+          <Button type='submit' disabled={isPending} className='min-w-32'>
+            {isPending ? (
+              <>
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                Publishing…
+              </>
+            ) : (
+              'Publish auction'
+            )}
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 };
 

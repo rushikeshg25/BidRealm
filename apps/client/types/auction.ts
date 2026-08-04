@@ -12,18 +12,29 @@ export const Auctionschema = z
       .string()
       .min(1, { message: 'Title is required' })
       .max(50, { message: 'Title is too long' }),
-    description: z.string().min(1, { message: 'Description is required' }),
-    startingPrice: z.number().min(1, { message: 'Starting price is required' }),
-    startDate: z.date().refine((date) => date > new Date(), {
-      message: 'Start value  must be in the future',
-    }),
-    endDate: z.date().refine((date) => date > new Date(), {
-      message: 'End value must be in the future',
-    }),
-    Categories: z.string().nonempty({ message: 'Category cannot be Empty' }),
+    description: z
+      .string()
+      .min(20, { message: 'Give buyers at least a sentence or two' })
+      .max(4000, { message: 'Description is too long' }),
+    startingPrice: z
+      // The number input can produce NaN for an empty field, which passed
+      // z.number() with an unhelpful "Expected number" message.
+      .number({ invalid_type_error: 'Enter a starting price' })
+      .int({ message: 'Starting price must be a whole number' })
+      .min(1, { message: 'Starting price must be at least ₹1' }),
+    startDate: z.date({ invalid_type_error: 'Choose when bidding opens' }).refine(
+      (date) => date > new Date(),
+      { message: 'Bidding must open in the future' }
+    ),
+    endDate: z
+      .date({ invalid_type_error: 'Choose when bidding closes' })
+      .refine((date) => date > new Date(), {
+        message: 'Bidding must close in the future',
+      }),
+    Categories: z.string().min(1, { message: 'Choose a category' }),
   })
   .refine((data) => data.endDate > data.startDate, {
-    message: 'End value must be after start value',
+    message: 'Bidding must close after it opens',
     path: ['endDate'],
   });
 
