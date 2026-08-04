@@ -2,6 +2,9 @@ import MyAuctions from '@/components/pages/MyAuctions';
 import { getAuth } from '@/lib/auth';
 import prisma from '@repo/db';
 import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = { title: 'My auctions' };
 
 export default async function Page({
   searchParams,
@@ -11,22 +14,21 @@ export default async function Page({
   };
 }) {
   const { session, user } = await getAuth();
-  if (!session) {
-    redirect('/sign-in');
-  }
+  if (!session) redirect('/sign-in?next=/my-auctions');
+
   const search = searchParams?.query || '';
-  const Auctions = await prisma.auction.findMany({
+
+  const auctions = await prisma.auction.findMany({
     where: {
       userId: user.id,
-      title: {
-        contains: search,
-        mode: 'insensitive',
-      },
+      ...(search
+        ? { title: { contains: search, mode: 'insensitive' } }
+        : {}),
     },
-    include: {
-      bids: true,
-    },
+    include: { bids: true },
+    orderBy: { createdAt: 'desc' },
   });
 
-  return <MyAuctions user={user} Auctions={Auctions} />;
+  // The `user` prop is gone: MyAuctions never read it.
+  return <MyAuctions auctions={auctions} />;
 }
