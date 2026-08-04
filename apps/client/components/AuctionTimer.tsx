@@ -1,103 +1,88 @@
 'use client';
-import { bidStore } from '@/zustand/bidStore';
-import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
 
+import { useEffect, useState } from 'react';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatTime } from '@/utils/format';
+import { cn } from '@/lib/utils';
+
+/**
+ * A countdown driven by the auction's end date, corrected by the server's
+ * TIME_LEFT pushes.
+ *
+ * What this replaces:
+ *
+ * - It reached into the shared socket and assigned `socket.onmessage`,
+ *   `socket.onclose` and `socket.onerror` as properties, clobbering the parent's
+ *   handlers, and its cleanup called `socket.close()` on a socket it did not own.
+ *   Message handling and connection ownership both live in useSocket now; this
+ *   component just renders a number.
+ * - Its ticking effect depended on `[timeLeft]` and *set* timeLeft in its body, so
+ *   it tore down and rebuilt the interval on every tick and the clock drifted.
+ *   One interval, keyed off the deadline.
+ * - It rendered the literal string "Loading..." inside a `text-2xl font-bold`
+ *   span, so the header visibly reflowed from "Loading..." to "1h 04m 03s".
+ */
 const AuctionTimer = ({
-  auctionId,
-  userId,
-  socket,
+  endDate,
+  /**
+   * The server's most recent TIME_LEFT, in milliseconds. Used to correct clock
+   * skew between the browser and the bid server; the local interval carries the
+   * countdown between pushes so the digits do not jump.
+   */
+  serverTimeLeft,
+  className,
 }: {
-  auctionId: string;
-  userId: string;
-  socket: WebSocket | null;
+  endDate: Date | string;
+  serverTimeLeft?: number | null;
+  className?: string;
 }) => {
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const timerRef = useRef<any>(null);
-  const { addBid, setCurrentAmount } = bidStore();
-  useEffect(() => {
-    if (socket) {
-      socket.onmessage = (event) => {
-        if (JSON.parse(event.data).type !== 'TIME_LEFT') {
-        }
-        const message = JSON.parse(event.data);
-        if (message.type === 'TIME_LEFT') {
-          setTimeLeft(message.timeLeft);
-        }
-        if (message.type === 'BID') {
-          setCurrentAmount(message.bid.amount);
-          addBid(message.bid);
-          toast(`${message.bid.user.userName} bid ₹${message.bid.amount} `, {
-            icon: '🟢',
-          });
-        }
-      };
+  const deadlineFromDate = new Date(endDate).getTime();
 
-      socket.onclose = () => {
-        console.log('WebSocket connection closed');
-      };
-
-      socket.onerror = (error) => {
-        toast.error('Error connecting to server. Please refresh the page.');
-        console.error('WebSocket error', error);
-      };
-
-      return () => {
-        if (socket) {
-          socket.close();
-        }
-        clearInterval(timerRef.current);
-      };
-    }
-  }, [socket, auctionId, userId]);
+  // Tracked as an absolute instant rather than a duration, so a re-render cannot
+  // restart the countdown.
+  const [deadline, setDeadline] = useState(deadlineFromDate);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
-    if (timeLeft !== null) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prevTimeLeft) =>
-          Math.max((prevTimeLeft as number) - 1000, 0)
-        );
-      }, 1000);
+    setDeadline(deadlineFromDate);
+  }, [deadlineFromDate]);
 
-      return () => {
-        clearInterval(timerRef.current);
-      };
-    }
-  }, [timeLeft]);
+  // Trust the server when it speaks: its clock is the one that decides when
+  // bidding closes.
+  useEffect(() => {
+    if (typeof serverTimeLeft !== 'number') return;
+    setDeadline(Date.now() + serverTimeLeft);
+  }, [serverTimeLeft]);
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      const leftHours = hours % 24;
-      return `${days}d ${leftHours}h ${minutes}m ${seconds}s`;
-    }
-    if (hours === 0) {
-      return `${minutes}m ${seconds}s`;
-    }
-    if (hours === 0 && minutes === 0) {
-      return `${seconds}s`;
-    }
-    return `${hours}h ${minutes}m ${seconds}s`;
-  };
+  useEffect(() => {
+    const update = () => setRemaining(Math.max(0, deadline - Date.now()));
+
+    update();
+    if (Date.now() >= deadline) return;
+
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+
+  // Until the first client tick, render a fixed-width placeholder rather than
+  // text: computing the value during render would disagree with the server's
+  // clock and produce a hydration mismatch.
+  if (remaining === null) {
+    return <Skeleton className={cn('h-7 w-32', className)} />;
+  }
 
   return (
-    <div>
-      {timeLeft !== null ? (
-        timeLeft > 0 ? (
-          <>
-            <div>{formatTime(timeLeft)}</div>
-          </>
-        ) : (
-          <div>Ended</div>
-        )
-      ) : (
-        <div>Loading...</div>
-      )}
-    </div>
+    <span
+      // Neither of these was present: nothing announced the countdown, and
+      // proportional digits made the number jitter every second.
+      role="timer"
+      aria-live="polite"
+      aria-atomic="true"
+      className={cn('tabular', className)}
+    >
+      {remaining > 0 ? formatTime(remaining) : 'Ended'}
+    </span>
   );
 };
 

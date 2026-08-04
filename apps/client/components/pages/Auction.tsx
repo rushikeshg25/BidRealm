@@ -1,4 +1,13 @@
 'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import date from 'date-and-time';
+import type { User } from 'lucia';
+import toast from 'react-hot-toast';
+import { AlertCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
+
 import {
   Table,
   TableBody,
@@ -7,32 +16,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getSocketTicket } from '@/actions/GetSocketTicket';
-import { bidStore } from '@/zustand/bidStore';
-import { AuctionDetailT } from '@repo/db/types';
-import date from 'date-and-time';
-import { User } from 'lucia';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Avatar, AvatarFallback, initialsOf } from '../ui/avatar';
+import { PageShell } from '../PageShell';
+import { PhaseBadge } from '../PhaseBadge';
 import AuctionTimer from '../AuctionTimer';
 import BidDialog from '../BidDialog';
-import { Button } from '../ui/button';
+import { bidStore } from '@/zustand/bidStore';
+import { useAuctionPhase } from '@/hooks/useAuctionPhase';
+import { useSocket, type ServerMessage } from '@/hooks/useSocket';
+import { cn } from '@/lib/utils';
+import { formatMoney, formatMoneyExact } from '@/utils/format';
+import type { AuctionDetailT, PublicBidT } from '@repo/db/types';
 
-// Next only inlines NEXT_PUBLIC_* into the browser bundle. This was
-// `process.env.WS_URL`, always undefined client-side, so every deployment fell
-// through to localhost and no user could ever connect to the real bid server.
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8080';
-const formatMoney = (amount: number) => {
-  if (amount >= 100000 && amount < 10000000) {
-    return `${amount / 1000000}L`;
-  } else if (amount >= 10000 && amount < 100000) {
-    return `${amount / 1000}K`;
-  } else if (amount >= 10000000) {
-    return `${amount / 10000000}cr`;
-  }
-  return `${amount}`;
-};
+const PLACEHOLDER = '/placeholder.png';
+
 const Auction = ({
   user,
   auction,
@@ -40,145 +40,293 @@ const Auction = ({
   user: User | null;
   auction: AuctionDetailT;
 }) => {
-  console.log('start', auction.startDate);
-  console.log('startcal', new Date() > new Date(auction.startDate));
-  console.log('end', auction.endDate);
-  console.log('endcal', new Date() > new Date(auction.endDate));
-  const [userInfo, setUserInfo] = useState<User | null | undefined>(user);
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const { initBids, bids, currentAmount, setCurrentAmount } = bidStore();
+  // Removed from here: four console.log calls of the auction's dates, sitting in
+  // the render body and firing on every render.
+  const phase = useAuctionPhase(auction);
+  const { addBid, bids, currentAmount, reset } = bidStore();
+  const [isBidDialogOpen, setIsBidDialogOpen] = useState(false);
+  const [serverTimeLeft, setServerTimeLeft] = useState<number | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
 
+  const isOwner = user?.id === auction.userId;
+  const isSignedIn = Boolean(user);
+
+  // The store is a module singleton, so it has to be reset for this auction --
+  // otherwise the previous auction's bids render until an effect overwrites them.
+  // Seeding currentAmount here too stops the price painting as ₹0 first.
   useEffect(() => {
-    setCurrentAmount(auction.currentPrice);
-    initBids(auction.bids);
-    if (!user) {
-      setUserInfo({
-        id: 'test',
-        email: 'test@test.com',
-      });
-    }
-  }, [user]);
+    reset(
+      auction.id,
+      auction.bids,
+      Math.max(auction.currentPrice, auction.startingPrice)
+    );
+  }, [auction.id, auction.bids, auction.currentPrice, auction.startingPrice, reset]);
 
-  useEffect(() => {
-    // Anonymous visitors get no socket at all. The connection URL no longer
-    // carries a `userId` for the server to trust — identity travels in a signed
-    // ticket that only a validated session can mint.
-    if (!user) return;
+  const handleMessage = useCallback(
+    (message: ServerMessage) => {
+      switch (message.type) {
+        case 'TIME_LEFT':
+          setServerTimeLeft(message.timeLeft);
+          break;
+        case 'BID': {
+          const bid = message.bid as PublicBidT;
+          addBid(bid);
+          toast(`${bid.user.userName} bid ₹${formatMoneyExact(bid.amount)}`, {
+            icon: '🔨',
+          });
+          break;
+        }
+        case 'AUCTION_ENDED':
+          toast('This auction has ended.', { icon: '⏰' });
+          break;
+        case 'ERROR':
+          // The server's rejections were previously never surfaced at all.
+          toast.error(message.message);
+          break;
+      }
+    },
+    [addBid]
+  );
 
-    let ws: WebSocket | null = null;
-    let cancelled = false;
+  const { status, send, isConnected } = useSocket({
+    auctionId: auction.id,
+    // Neither anonymous visitors nor the seller may bid, so neither needs a
+    // socket. The old code connected regardless, with `userId=undefined` in the
+    // URL, and decided who was logged in by injecting a fake
+    // `{ id: 'test', email: 'test@test.com' }` user and then checking
+    // `userInfo?.id !== 'test'`.
+    enabled: isSignedIn && !isOwner && phase === 'live',
+    onMessage: handleMessage,
+  });
 
-    (async () => {
-      const result = await getSocketTicket(auction.id);
-      if (cancelled) return;
-      if (!result.ok) return;
+  const placeBid = useCallback(
+    (amount: number) => send({ type: 'bid', amount }),
+    [send]
+  );
 
-      ws = new WebSocket(
-        `${WS_URL}?auctionId=${auction.id}&ticket=${encodeURIComponent(result.ticket)}`
-      );
-      ws.onopen = () => setSocket(ws);
-      ws.onclose = () => setSocket(null);
-    })();
+  // Derived from the maximum amount rather than `bids[0]`, which assumed the list
+  // was ordered by amount when it is ordered by insertion time.
+  const highestBid = useMemo(
+    () =>
+      bids.reduce<PublicBidT | null>(
+        (best, bid) => (!best || bid.amount > best.amount ? bid : best),
+        null
+      ),
+    [bids]
+  );
+  const isHighestBidder = Boolean(user && highestBid?.user.id === user.id);
 
-    return () => {
-      cancelled = true;
-      ws?.close();
-    };
-  }, [user?.id, auction.id]);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const handleModal = () => {
-    setIsModalOpen(!isModalOpen);
-  };
-
-  const router = useRouter();
+  // next/image throws on src="" -- reachable, because auctions could previously be
+  // created with no image at all.
+  const imageSrc = !auction.image || imageFailed ? PLACEHOLDER : auction.image;
 
   return (
-    <div className='flex flex-col items-center justify-center h-full p-4 bg-background md:p-8'>
-      <div className='grid w-full max-w-6xl grid-cols-1 gap-8 md:grid-cols-2'>
-        <div className='flex flex-col gap-4'>
-          <div className='flex items-center justify-center  rounded-lg relative w-full h-full  border border--card dark:border--card'>
+    <PageShell>
+      <div className='grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr]'>
+        {/* Left: the item */}
+        <div className='space-y-5'>
+          <div className='relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted'>
+            {/*
+              Was width={250} height={250} with `object-cover p-3` inside a
+              `w-full h-full` flex box, so the hero was a small square floating in
+              a large bordered container. And `border--card` twice, a double-dash
+              typo that resolved to nothing.
+            */}
             <Image
-              src={auction.image}
+              src={imageSrc}
               alt={auction.title}
-              width={250}
-              height={250}
-              className='object-cover p-3 '
+              fill
+              priority
+              sizes='(min-width: 1024px) 55vw, 100vw'
+              className='object-cover'
+              onError={() => setImageFailed(true)}
             />
+            <div className='absolute left-4 top-4'>
+              <PhaseBadge phase={phase} />
+            </div>
           </div>
-          <div className='flex flex-col gap-1'>
-            <h1 className='text-2xl font-bold'>{auction.title}</h1>
-            <h2 className='text-muted-foreground flex flex-row gap-1'>
-              Item listed by:{' '}
-              <p className='font-bold'>{auction.user.userName}</p>
-            </h2>
-            <p className='text-muted-foreground'>{auction.description}</p>
+
+          <div className='space-y-4'>
+            <div className='space-y-2'>
+              <Badge variant='secondary'>{auction.categories}</Badge>
+              <h1 className='text-2xl font-semibold tracking-tight sm:text-3xl'>
+                {auction.title}
+              </h1>
+            </div>
+
+            <div className='flex items-center gap-3'>
+              <Avatar className='h-8 w-8'>
+                <AvatarFallback>
+                  {initialsOf(auction.user.userName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className='text-sm'>
+                <p className='text-muted-foreground'>Listed by</p>
+                <p className='font-medium'>{auction.user.userName}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <p className='whitespace-pre-line text-sm leading-relaxed text-muted-foreground'>
+              {auction.description}
+            </p>
           </div>
         </div>
-        <div className='flex flex-col gap-6'>
-          <div className='flex flex-col gap-2 p-1 rounded-lg bg-card'>
-            <div className='flex items-center justify-between'>
-              <span className='text-lg font-semibold'>Current Bid</span>
-              <span className='text-2xl font-bold text-primary'>
-                ₹{formatMoney(currentAmount).toLocaleString()}
-              </span>
-            </div>
-            <div className='flex items-center justify-between'>
-              <span className='text-lg font-semibold'>Starting Bid</span>
-              <span className='text-2xl font-bold text-primary'>
-                ₹{formatMoney(auction.startingPrice).toLocaleString()}
-              </span>
-            </div>
-            <div className='flex items-center justify-between'>
-              <span className='text-lg font-semibold'>Time Left</span>
 
-              <span className='text-2xl font-bold text-primary'>
-                {new Date(auction.startDate) < new Date() &&
-                new Date(auction.endDate) > new Date() ? (
+        {/* Right: bidding */}
+        <div className='space-y-6 lg:sticky lg:top-24 lg:self-start'>
+          {/* Padding was `p-1` here against `p-6` on the history panel below. */}
+          <div className='space-y-4 rounded-lg border bg-card p-5'>
+            <div className='space-y-1'>
+              <p className='text-sm text-muted-foreground'>
+                {phase === 'upcoming'
+                  ? 'Starting price'
+                  : phase === 'live'
+                    ? 'Current bid'
+                    : 'Final price'}
+              </p>
+              {/*
+                Was `₹{formatMoney(currentAmount).toLocaleString()}` --
+                formatMoney returns a string, so .toLocaleString() was a no-op on
+                a string. Twice.
+              */}
+              <p className='tabular text-3xl font-semibold'>
+                ₹{formatMoneyExact(currentAmount)}
+              </p>
+              {phase !== 'upcoming' && bids.length > 0 ? (
+                <p className='text-xs text-muted-foreground'>
+                  {bids.length} {bids.length === 1 ? 'bid' : 'bids'} · opened at ₹
+                  {formatMoney(auction.startingPrice)}
+                </p>
+              ) : null}
+            </div>
+
+            <Separator />
+
+            <div className='flex items-center justify-between gap-3'>
+              <span className='text-sm text-muted-foreground'>
+                {phase === 'live'
+                  ? 'Ends in'
+                  : phase === 'upcoming'
+                    ? 'Opens'
+                    : 'Ended'}
+              </span>
+              <span className='text-right font-semibold'>
+                {phase === 'live' ? (
                   <AuctionTimer
-                    auctionId={auction.id}
-                    userId={userInfo?.id as string}
-                    socket={socket}
+                    endDate={auction.endDate}
+                    serverTimeLeft={serverTimeLeft}
                   />
-                ) : new Date(auction.startDate) < new Date() &&
-                  new Date(auction.endDate) < new Date() ? (
-                  <>Ended</>
                 ) : (
-                  <>Yet to Start</>
+                  <span className='tabular'>
+                    {date.format(
+                      new Date(
+                        phase === 'upcoming' ? auction.startDate : auction.endDate
+                      ),
+                      'DD MMM YYYY, HH:mm'
+                    )}
+                  </span>
                 )}
               </span>
             </div>
-            {user?.id == auction.userId ? (
-              <Button disabled={true}>This Auction is Listed by You!</Button>
-            ) : userInfo?.id !== 'test' ? (
-              bids[0]?.user.id === user?.id ? (
-                <Button disabled={true}>You hold the highest bid</Button>
-              ) : (
-                <BidDialog
-                  handleModal={handleModal}
-                  value={isModalOpen}
-                  startPrice={auction.currentPrice}
-                  currentPrice={auction.currentPrice}
-                  auctionId={auction.id}
-                  userId={userInfo?.id as string}
-                  socket={socket}
-                />
-              )
-            ) : (
-              <Button
-                onClick={() => router.push('/sign-in')}
-                className='w-full'
+
+            {/* Connection state was invisible: a dropped socket looked identical
+                to a healthy one until a bid vanished. */}
+            {isSignedIn && !isOwner && phase === 'live' ? (
+              <div
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs',
+                  isConnected
+                    ? 'bg-live/10 text-live'
+                    : status === 'closed'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-muted text-muted-foreground'
+                )}
+                role='status'
               >
-                Login to Place a Bid
+                {isConnected ? (
+                  <>
+                    <Wifi className='h-3.5 w-3.5' />
+                    Live — bids update in real time
+                  </>
+                ) : status === 'closed' ? (
+                  <>
+                    <WifiOff className='h-3.5 w-3.5' />
+                    Disconnected. Reload to try again.
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    Connecting to the auction…
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {/* The branch order matters: owner, then phase, then signed-in. */}
+            {isOwner ? (
+              <Button disabled className='w-full'>
+                This auction is listed by you
               </Button>
+            ) : phase === 'ended' ? (
+              <Button disabled className='w-full'>
+                Bidding has closed
+              </Button>
+            ) : phase === 'upcoming' ? (
+              <Button disabled className='w-full'>
+                Bidding has not opened yet
+              </Button>
+            ) : !isSignedIn ? (
+              <Button asChild className='w-full'>
+                <Link href={`/sign-in?next=/auction/${auction.id}`}>
+                  Sign in to place a bid
+                </Link>
+              </Button>
+            ) : isHighestBidder ? (
+              <div className='space-y-2'>
+                <Button disabled className='w-full'>
+                  You hold the highest bid
+                </Button>
+                <p className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+                  <AlertCircle className='h-3.5 w-3.5' />
+                  You will be notified if someone outbids you.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/*
+                  The trigger lives here rather than inside the dialog. It used to
+                  be a DialogTrigger *inside* a controlled Dialog, so the page's
+                  primary CTA both toggled state the parent also owned and was
+                  coupled to the dialog's internals.
+                */}
+                <Button
+                  size='lg'
+                  className='w-full'
+                  onClick={() => setIsBidDialogOpen(true)}
+                  disabled={!isConnected}
+                >
+                  {isConnected ? 'Place bid' : 'Connecting…'}
+                </Button>
+                <BidDialog
+                  open={isBidDialogOpen}
+                  onOpenChange={setIsBidDialogOpen}
+                  currentAmount={currentAmount}
+                  startingPrice={auction.startingPrice}
+                  isConnected={isConnected}
+                  onBid={placeBid}
+                />
+              </>
             )}
           </div>
-          <div className='flex flex-col gap-4 p-6 rounded-lg bg-card '>
-            <h2 className='text-xl font-bold'>Bid History</h2>
-            <Table containerClassname='h-fit max-h-80 overflow-y-auto relative dark:border--card rounded-xl border border--card dark:border'>
-              <TableHeader>
+
+          <div className='space-y-4 rounded-lg border bg-card p-5'>
+            <h2 className='font-semibold'>Bid history</h2>
+            <Table containerClassname='max-h-80 overflow-y-auto rounded-md border'>
+              <TableHeader className='sticky top-0 bg-card'>
                 <TableRow>
-                  <TableHead className='w-[100px]'>Bidder</TableHead>
+                  <TableHead>Bidder</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead className='text-right'>Amount</TableHead>
                 </TableRow>
@@ -186,22 +334,36 @@ const Auction = ({
               <TableBody>
                 {bids.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2}>No bids yet</TableCell>
+                    {/* Was colSpan={2} in a three-column table. */}
+                    <TableCell
+                      colSpan={3}
+                      className='py-8 text-center text-sm text-muted-foreground'
+                    >
+                      No bids yet — be the first.
+                    </TableCell>
                   </TableRow>
                 ) : (
-                  bids.map((bid, index) => (
-                    <TableRow key={index}>
+                  bids.map((bid) => (
+                    // Keyed by bid.id, not by array index. The store *prepends*
+                    // new bids, so index keys shifted every row's identity on each
+                    // incoming bid and React re-rendered the whole table instead
+                    // of inserting one row.
+                    <TableRow key={bid.id} className='animate-slide-up'>
                       <TableCell className='font-medium'>
-                        {bid.user.userName}
+                        <span className='flex items-center gap-2'>
+                          {bid.user.userName}
+                          {highestBid?.id === bid.id ? (
+                            <Badge variant='live' className='text-[10px]'>
+                              Highest
+                            </Badge>
+                          ) : null}
+                        </span>
                       </TableCell>
-                      <TableCell>
-                        {date.format(
-                          new Date(bid.createdAt),
-                          'YYYY/MM/DD HH:mm:ss'
-                        )}
+                      <TableCell className='tabular text-muted-foreground'>
+                        {date.format(new Date(bid.createdAt), 'DD MMM HH:mm:ss')}
                       </TableCell>
-                      <TableCell className='text-right'>
-                        ₹{bid.amount.toLocaleString()}
+                      <TableCell className='tabular text-right font-medium'>
+                        ₹{formatMoneyExact(bid.amount)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -211,7 +373,7 @@ const Auction = ({
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 };
 
