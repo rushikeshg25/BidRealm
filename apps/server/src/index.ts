@@ -5,7 +5,7 @@ import { verifyTicket } from "@repo/ws-ticket";
 import { serverEnv } from "@repo/env/server";
 import { AuctionManager } from "./AuctionManager";
 import { User } from "./utils/SocketManager";
-import { db } from "./db";
+import { db, AuctionStatus } from "./db";
 
 const app = express();
 
@@ -19,6 +19,51 @@ const httpServer = app.listen(serverEnv.PORT, () => {
 
 const wss = new WebSocketServer({ server: httpServer, path: "/" });
 const auctionManager = new AuctionManager();
+
+/**
+ * Auction statuses used to be recalculated only when someone opened a socket, so
+ * an auction nobody was watching never transitioned out of INACTIVE and never
+ * reached ENDED -- it just sat there with a stale status until a visitor arrived.
+ * This sweep runs regardless of who is connected. It is cheap now that
+ * Auction.status and Auction.endDate are indexed.
+ */
+const STATUS_SWEEP_INTERVAL_MS = 60_000;
+
+const sweepAuctionStatuses = async () => {
+  const now = new Date();
+
+  const [started, ended] = await Promise.all([
+    db.auction.updateMany({
+      where: {
+        status: AuctionStatus.INACTIVE,
+        startDate: { lte: now },
+        endDate: { gt: now },
+      },
+      data: { status: AuctionStatus.ACTIVE },
+    }),
+    db.auction.updateMany({
+      where: {
+        status: { in: [AuctionStatus.INACTIVE, AuctionStatus.ACTIVE] },
+        endDate: { lte: now },
+      },
+      data: { status: AuctionStatus.ENDED },
+    }),
+  ]);
+
+  if (started.count || ended.count) {
+    console.log(`status sweep: ${started.count} started, ${ended.count} ended`);
+  }
+};
+
+const sweeper = setInterval(() => {
+  sweepAuctionStatuses().catch((error) =>
+    console.error("status sweep failed", error)
+  );
+}, STATUS_SWEEP_INTERVAL_MS);
+
+sweepAuctionStatuses().catch((error) =>
+  console.error("initial status sweep failed", error)
+);
 
 /** Close codes in the 4xxx range are reserved for applications. */
 const CLOSE_UNAUTHORIZED = 4001;
@@ -95,3 +140,14 @@ wss.on("connection", async function connection(ws, req) {
     auctionManager.removeHandler(user);
   });
 });
+
+const shutdown = (signal: string) => {
+  console.log(`${signal} received, shutting down`);
+  clearInterval(sweeper);
+  auctionManager.shutdown();
+  wss.close();
+  httpServer.close(() => process.exit(0));
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
