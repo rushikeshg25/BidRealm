@@ -16,6 +16,10 @@ export const lucia = new Lucia(adapter, {
   getUserAttributes: (attributes) => {
     return {
       email: attributes.email,
+      // userName was not exposed, so nothing that had a session could show who
+      // was signed in -- the navbar's account menu had no accessible name and no
+      // initials to render.
+      userName: attributes.userName,
     };
   },
 });
@@ -51,7 +55,15 @@ export const getAuth = cache(
           sessionCookie.attributes
         );
       }
-    } catch {}
+    } catch (error) {
+      // Was a bare `catch {}`. Setting a cookie throws when called from a
+      // context Next does not allow it in (a Server Component render), which is
+      // expected and must not break the page -- but swallowing it silently meant
+      // session refresh failures were invisible.
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('could not write session cookie during render', error);
+      }
+    }
     return result;
   }
 );
@@ -65,4 +77,5 @@ declare module "lucia" {
 
 interface DatabaseUserAttributes {
   email: string;
+  userName: string;
 }

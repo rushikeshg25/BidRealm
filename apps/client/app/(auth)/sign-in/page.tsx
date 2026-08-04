@@ -15,27 +15,31 @@ const SignIn = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
   });
 
-  const { mutate: server_Signin } = useMutation({
+  const { mutateAsync: server_Signin, isPending } = useMutation({
     mutationFn: Signin,
-    onSuccess: () => {
-      toast.success('Signed in successfully');
+    onSuccess: (result) => {
+      // On success the action redirects, so nothing comes back -- only a
+      // rejection produces a result to render. The previous version relied on
+      // the thrown error's message, which meant the raw distinction between
+      // "User not found with Entered email" and "Invalid password" was shown to
+      // the user (and to anyone probing for registered addresses).
+      if (result && !result.ok) toast.error(result.error);
     },
-    onError: (error) => {
-      toast.error(error.message);
+    onError: () => {
+      toast.error('Could not sign you in. Please try again.');
     },
   });
 
   const onSubmit = async (Formdata: signInSchemaT) => {
-    try {
-      await server_Signin(Formdata);
-    } catch (error) {
-      toast.error('Error signing up. Try again!');
-    }
+    // `mutate` returns void, so the previous `await mutate(...)` inside a
+    // try/catch could never catch anything and isSubmitting flipped back
+    // immediately -- the disabled state and the catch block were both dead code.
+    await server_Signin(Formdata);
   };
 
   return (
@@ -84,7 +88,7 @@ const SignIn = () => {
 
           <Button
             type='submit'
-            disabled={isSubmitting}
+            disabled={isPending}
             className='w-full px-4 py-2 font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-muted'
           >
             Sign In

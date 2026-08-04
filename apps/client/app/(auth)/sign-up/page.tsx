@@ -15,28 +15,28 @@ const SignUp = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
   });
 
-  const { mutate: server_Signup } = useMutation({
+  const { mutateAsync: server_Signup, isPending } = useMutation({
     mutationFn: signUp,
-    onSuccess: () => {
-      toast.success('Signup successful');
+    onSuccess: (result) => {
+      // On success the action redirects, so only a rejection returns anything --
+      // and it now names the offending field ("That username is taken") instead
+      // of surfacing a raw thrown Error's message.
+      if (result && !result.ok) toast.error(result.error);
     },
-    onError: (error) => {
-      toast.error(error.message);
+    onError: () => {
+      toast.error('Could not create your account. Please try again.');
     },
   });
 
   const onSubmit = async (Formdata: signUpSchemaT) => {
-    try {
-      await server_Signup(Formdata);
-    } catch (error) {
-      console.log(error);
-      toast.error('Error signing up. Try again!');
-    }
+    // `mutate` returns void, so the previous `await mutate(...)` in a try/catch
+    // could never catch anything and isSubmitting resolved instantly.
+    await server_Signup(Formdata);
   };
 
   return (
@@ -123,7 +123,7 @@ const SignUp = () => {
           </div>
           <Button
             type='submit'
-            disabled={isSubmitting}
+            disabled={isPending}
             className='w-full px-4 py-2 font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-muted'
           >
             Sign Up

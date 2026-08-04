@@ -7,7 +7,12 @@ export const signUpSchema = z
       .min(1, 'Username is required')
       .max(50, 'Username cannot exceed 50 characters'),
     email: z.string().min(1, 'Email is required').email('Invalid email format'),
-    password: z.string(),
+    // Was a bare z.string() with no minimum, while signInSchema requires eight
+    // characters -- so sign-up accepted passwords that sign-in would then reject.
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long')
+      .max(50, 'Password cannot exceed 50 characters'),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {

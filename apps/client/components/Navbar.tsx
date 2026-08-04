@@ -21,6 +21,7 @@ import { Button } from './ui/button';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import Signout from '@/actions/auth/Signout';
+import toast from 'react-hot-toast';
 import Search from './Search';
 import {
   Sheet,
@@ -43,8 +44,11 @@ const Navbar = ({
   const router = useRouter();
   const { mutate: server_Signout } = useMutation({
     mutationFn: Signout,
-    onSuccess: () => {
-      router.push('/');
+    // The action redirects to /sign-in and revalidates the layout itself now, so
+    // there is nothing to push. The missing onError meant a failed signout was
+    // completely silent -- the user stayed logged in with no indication why.
+    onError: () => {
+      toast.error('Could not sign you out. Please try again.');
     },
   });
   const LoginHandler = () => {

@@ -48,14 +48,9 @@ const CreateAuction = ({ user }: { user: User }) => {
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [imgUrl, setImgUrl] = useState<string>("");
-  const [data, setData] = useState<AuctionT>({
-    title: "",
-    description: "",
-    startingPrice: 0,
-    startDate: new Date(),
-    endDate: new Date(),
-    Categories: "",
-  });
+  // The `data` state that used to live here is gone -- react-hook-form already
+  // holds the form's values and hands them to onSubmit. Mirroring them into a
+  // second useState was what created the stale-submit bug.
   const {
     register,
     handleSubmit,
@@ -66,15 +61,26 @@ const CreateAuction = ({ user }: { user: User }) => {
   });
 
   const { mutate: server_createAuction } = useMutation({
-    mutationFn: async () => {
-      return await createAuction(data, imgUrl, user?.id as string);
+    // The payload is an argument now. It used to be read from the `data` state
+    // variable, which onSubmit set with setData() and then immediately submitted
+    // -- but setState is asynchronous, so the closure still held the previous
+    // value and the first submit posted the empty initial state.
+    //
+    // `userId` is also gone: it used to be passed from the client, which meant
+    // anyone could create auctions attributed to any user. The action reads it
+    // from the session.
+    mutationFn: async (payload: AuctionT) => {
+      return await createAuction(payload, imgUrl);
     },
-    onSuccess: (data) => {
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Auction created successfully!");
       router.push("/my-auctions");
     },
-    onError: (error) => {
-      console.log("Uploading error", error);
+    onError: () => {
       toast.error("We couldn't create your auction. Please try again.");
     },
   });
@@ -101,9 +107,8 @@ const CreateAuction = ({ user }: { user: User }) => {
     setValue("Categories", category);
   }, [category]);
 
-  const onSubmit = async (data: AuctionT) => {
-    setData(() => data);
-    await server_createAuction();
+  const onSubmit = (data: AuctionT) => {
+    server_createAuction(data);
   };
   return (
     <div className="max-w-4xl px-4 py-5 mx-auto mt-10 sm:px-6 lg:px-8 dark:border border rounded-lg mb-10">

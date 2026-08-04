@@ -47,11 +47,21 @@ const MyAuctions = ({
   };
   const { mutate: server_deleteAuction } = useMutation({
     mutationFn: deleteAuction,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // The action returns a result rather than throwing, so a rejected delete
+      // (not signed in, not the owner) reports its real reason. This previously
+      // showed a hardcoded 'Error deleting auction' and discarded the cause.
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success('Auction deleted successfully');
+      // revalidatePath alone did not reliably drop the row from the rendered
+      // table, so it usually stayed until a manual reload.
+      router.refresh();
     },
-    onError: (error) => {
-      toast.error('Error deleting auction');
+    onError: () => {
+      toast.error('Could not delete that auction. Please try again.');
     },
   });
 
