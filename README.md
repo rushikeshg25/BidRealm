@@ -31,44 +31,83 @@ System consists of the following components:
 ## Technologies Used
 
 - Next.js for the client-side application
-- Express.js for the WebSocket server
-- PostgreSQL and PrismaORM for data persistence
-- Redis for message queue to process Emails
-- WebSockets(ws) for real-time communication
-- Lucia for Auth
-- UploadThing for Image Upload
-- NodeMailer for Emails
-- Turborepo
-- Toast Notifications(react-hot-toast), Tailwind, zod, zustand, shadcn-ui
+- Express.js + `ws` for the WebSocket server
+- PostgreSQL and Prisma ORM for data persistence
+- Redis as the queue between the auction server and the email worker
+- Lucia for authentication, with HMAC-signed tickets authenticating the WebSocket handshake
+- UploadThing for image upload
+- Nodemailer for email
+- Turborepo, Tailwind, shadcn-ui, zod, zustand, react-hot-toast
+- Vitest for tests
+
+## How bidding works
+
+A bid is not a write the browser can make. The flow is:
+
+1. The browser asks the Next app for a **ticket** (`/api/ws-ticket`). Only the
+   Next app can read the Lucia session cookie, so only it can vouch for who you
+   are. The ticket is HMAC-signed with `AUTH_SECRET`, scoped to one auction, and
+   valid for 60 seconds.
+2. The browser opens a socket to the auction server with that ticket. Without
+   one you are still connected, as a spectator: you see every bid, but the
+   server refuses any you send.
+3. A bid is accepted inside a single transaction whose price update is guarded
+   by `currentPrice < amount`. Two simultaneous bids cannot both win, and a late
+   bid can never drag the price back down. The bidder gets an explicit
+   `BID_ACCEPTED` or `BID_REJECTED` with a reason.
+4. A sweep advances auction status straight from the database every 15 seconds,
+   so lots open and close on schedule whether or not anyone is watching. On
+   close it queues the winner and consignor emails to Redis, which the worker
+   drains.
+
+`AUTH_SECRET` must be identical in `apps/client` and `apps/server`, or nobody
+can bid.
 
 ## Getting Started
 
-Follow these steps to set up Bid Realm for local development:
+Follow these steps to set up BidRealm for local development:
 
 1. Clone the repository:
 ```
 git clone https://github.com/rushikeshg25/BidRealm-turbo.git
 cd BidRealm-turbo
 ```
-3. Install dependencies:
+
+2. Install dependencies:
 ```
 yarn
 ```
-5. Set up environment variables:
-- Copy the `.env.example` file in the `packages/db` directory and all app directories to `.env`.
-- Fill in the necessary environment variables in each `.env` file.
+
+3. Set up environment variables. Copy the `.env.example` in `packages/db` and in
+   each app directory to `.env` and fill them in. Note that `AUTH_SECRET` must be
+   the same value in `apps/client` and `apps/server`, and that the browser reads
+   `NEXT_PUBLIC_WS_URL` -- without the prefix Next never inlines it and the
+   client falls back to localhost.
 
 4. Set up the database:
 ```
-yarn prisma migrate dev
-yarn prisma generate
+yarn --cwd packages/db prisma migrate dev
+yarn --cwd packages/db db:generate
+yarn --cwd packages/db db:seed   # optional sample lots
 ```
 
-6. Start the development server:
+5. Start everything:
 ```
-yarn run dev
+yarn dev
 ```
-The application should now be running on `http://localhost:3000` 
+The client runs on `http://localhost:3000` and the auction server on
+`http://localhost:8080`. The email worker needs Redis; without it bidding still
+works and notifications are skipped.
+
+## Tests
+
+```
+yarn test
+```
+
+Vitest covers the rules where being wrong is a security hole or a wrong price on
+screen: ticket verification, the bid guards and the simultaneous-bid race, frame
+validation, and the money and countdown formatters.
 
 ## Contributing
 

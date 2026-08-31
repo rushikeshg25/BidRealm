@@ -1,4 +1,4 @@
-import { AuctionStatus } from '@prisma/client';
+import { AuctionStatus, Category } from '@prisma/client';
 
 const addDays = (days: number) => {
   const date = new Date();
@@ -16,10 +16,9 @@ const ITEMS = [
   {
     title: 'Mustang 1969',
     image: 'https://utfs.io/f/d167f3b5-b5ff-4bca-a8b5-16833eba7a90-yaf61w.jpg',
-    categories: 'VECHILES',
+    category: Category.VEHICLES,
     status: AuctionStatus.ENDED,
     startingPrice: 3000000,
-    currentPrice: 0,
     startDate: new Date(),
     endDate: addDays(10),
     description:
@@ -28,10 +27,9 @@ const ITEMS = [
   {
     title: 'Macbook Pro',
     image: 'https://utfs.io/f/49d14369-4ce6-4304-b028-1ef1353271e1-2b7z.jpeg',
-    categories: 'Electronics',
+    category: Category.ELECTRONICS,
     status: AuctionStatus.ACTIVE,
     startingPrice: 120000,
-    currentPrice: 0,
     startDate: addDays(2),
     endDate: addMonths(1),
     description:
@@ -40,10 +38,9 @@ const ITEMS = [
   {
     title: 'Medieval Skates',
     image: 'https://utfs.io/f/9dadd8a2-b16a-4840-9cae-b35aea3edd67-xzrd42.avif',
-    categories: 'Collectables',
+    category: Category.COLLECTABLES,
     status: AuctionStatus.ACTIVE,
     startingPrice: 2997,
-    currentPrice: 0,
     startDate: addDays(5),
     endDate: addDays(20),
     description:
@@ -52,10 +49,9 @@ const ITEMS = [
   {
     title: 'Chevrolet Lowrider',
     image: 'https://utfs.io/f/b10ca0bb-4b9c-4541-9f2f-4627d4ce647f-dskxl8.avif',
-    categories: 'Vehicles',
+    category: Category.VEHICLES,
     status: AuctionStatus.INACTIVE,
     startingPrice: 500000,
-    currentPrice: 0,
     startDate: new Date(),
     endDate: addDays(5),
     description:
@@ -64,10 +60,9 @@ const ITEMS = [
   {
     title: 'Authentic T. rex Skull',
     image: 'https://utfs.io/f/ad062102-f649-469e-85b5-5b55cb7f3184-6s5r5h.avif',
-    categories: 'Collectables',
+    category: Category.COLLECTABLES,
     status: AuctionStatus.INACTIVE,
     startingPrice: 20000000,
-    currentPrice: 0,
     startDate: new Date(),
     endDate: addDays(2),
     description:
@@ -76,10 +71,9 @@ const ITEMS = [
   {
     title: 'Vintage German Revolver',
     image: 'https://utfs.io/f/c5a8ecbd-7a30-498a-90f7-98c88b613373-gc839l.avif',
-    categories: 'Collectables',
+    category: Category.COLLECTABLES,
     status: AuctionStatus.INACTIVE,
     startingPrice: 4300000,
-    currentPrice: 0,
     startDate: addDays(10),
     endDate: addMonths(2),
     description:

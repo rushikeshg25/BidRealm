@@ -1,40 +1,47 @@
 'use server';
 
 import { lucia } from '@/lib/auth';
-import { signInSchemaT } from '@/types/auth';
+import { signInSchema } from '@/types/auth';
 import prisma from '@repo/db';
 import * as argon2 from 'argon2';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
-const Signin = async (formData: signInSchemaT) => {
+export type AuthResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Returns a result rather than throwing. The raw messages this used to throw
+ * ("User not found with Entered email") were piped straight into a toast, which
+ * told anyone who asked whether a given address had an account. One message
+ * covers both halves now.
+ */
+const GENERIC_FAILURE = 'Email or password is incorrect.';
+
+const Signin = async (formData: unknown): Promise<AuthResult> => {
+  const parsed = signInSchema.safeParse(formData);
+  if (!parsed.success) return { ok: false, error: GENERIC_FAILURE };
+
   try {
     const user = await prisma.user.findUnique({
-      where: {
-        email: formData.email,
-      },
+      where: { email: parsed.data.email },
+      select: { id: true, hashedPassword: true },
     });
-    if (!user) {
-      throw new Error('User not found with Entered email');
-    }
+    if (!user) return { ok: false, error: GENERIC_FAILURE };
+
     const validPassword = await argon2.verify(
       user.hashedPassword,
-      formData.password
+      parsed.data.password
     );
-    if (!validPassword) {
-      throw new Error('Invalid password');
-    }
+    if (!validPassword) return { ok: false, error: GENERIC_FAILURE };
+
     const session = await lucia.createSession(user.id, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
-    cookies().set(
-      sessionCookie.name,
-      sessionCookie.value,
-      sessionCookie.attributes
-    );
-    redirect('/');
+    cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+
+    return { ok: true };
   } catch (error) {
-    console.error('Error during sign in:', error);
-    throw error;
+    console.error('Sign in failed:', error);
+    return { ok: false, error: 'Something went wrong. Try again.' };
   }
 };
+
 export default Signin;

@@ -8,19 +8,19 @@ datasource db {
 }
 
 model User {
-  id              String    @id 
-  sessions        Session[]
-  userName        String    @unique
-  email           String    @unique
-  hashedPassword  String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  auctions        Auction[]
-  bids            Bid[]
+  id             String    @id
+  sessions       Session[]
+  userName       String    @unique
+  email          String    @unique
+  hashedPassword String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  auctions       Auction[]
+  bids           Bid[]
 }
 
 model Auction {
-  id            String       @id @default(cuid())
+  id            String        @id @default(cuid())
   title         String
   description   String
   startingPrice Int
@@ -28,24 +28,35 @@ model Auction {
   startDate     DateTime
   endDate       DateTime
   status        AuctionStatus
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
   bids          Bid[]
   image         String
-  categories    String
+  category      Category
+
+  // The lifecycle scheduler sweeps on (status, startDate) and (status, endDate);
+  // the listings page sorts by createdAt and filters by category.
+  @@index([status, endDate])
+  @@index([status, startDate])
+  @@index([category])
+  @@index([createdAt])
 }
 
 model Bid {
-  id        String      @id @default(cuid())
-  amount    Float
+  id        String   @id @default(cuid())
+  amount    Int
   createdAt DateTime @default(now())
   userId    String
   auctionId String
-  
-  user      User     @relation(fields: [userId], references: [id])
-  auction   Auction  @relation(fields: [auctionId], references: [id])
+
+  user    User    @relation(fields: [userId], references: [id])
+  auction Auction @relation(fields: [auctionId], references: [id])
+
+  // Ledger reads are "newest bids for this auction"; My Bids reads by user.
+  @@index([auctionId, createdAt])
+  @@index([userId])
 }
 
 model Session {
@@ -53,13 +64,24 @@ model Session {
   expiresAt DateTime
   userId    String
   user      User     @relation(references: [id], fields: [userId], onDelete: Cascade)
+
+  @@index([userId])
 }
-
-
 
 enum AuctionStatus {
   INACTIVE
   ACTIVE
   ENDED
   CANCELLED
+}
+
+enum Category {
+  ART
+  COLLECTABLES
+  ELECTRONICS
+  VEHICLES
+  WATCHES
+  FASHION
+  SHOES
+  MISCELLANEOUS
 }

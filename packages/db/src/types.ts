@@ -1,10 +1,9 @@
-import { Bid, Auction, AuctionStatus, User, Prisma } from '@prisma/client';
-
-import prisma from './index';
+import { Bid, Auction, AuctionStatus, Category, User, Prisma } from '@prisma/client';
 
 export type BidT = Bid;
 export type AuctionT = Auction;
 export type AuctionStatusT = AuctionStatus;
+export type CategoryT = Category;
 export type UserT = User;
 
 export type AuctionWithBidsandUserT = Prisma.AuctionGetPayload<{
@@ -55,5 +54,7 @@ export type BidsWithUser = Prisma.BidGetPayload<{
   };
 }>;
 
-export const AuctionStatusHelper = AuctionStatus;
-export const AuctionStatusHelperT = AuctionStatus;
+// Prisma's generated enums are the single source of truth for status and category.
+// Anything that needs the runtime values imports them from here rather than
+// declaring its own copy.
+export { AuctionStatus, Category };

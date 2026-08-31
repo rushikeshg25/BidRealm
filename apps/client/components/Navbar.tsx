@@ -1,13 +1,8 @@
 'use client';
-import React from 'react';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-import GavelIcon from './icons/GavelIcon';
-import UserIcon from './icons/UserIcon';
-import { ModeToggle } from './ThemeToggle';
-import { GitHubLogoIcon } from '@radix-ui/react-icons';
-import { cn } from '@/lib/utils';
-import { Menu } from 'lucide-react';
+
+import Signout from '@/actions/auth/Signout';
+import { ModeToggle } from '@/components/ThemeToggle';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Session } from 'lucia';
-import { Button } from './ui/button';
-import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
-import Signout from '@/actions/auth/Signout';
-import Search from './Search';
 import {
   Sheet,
   SheetClose,
@@ -29,145 +18,165 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from './ui/sheet';
+} from '@/components/ui/sheet';
+import { GitHubLogoIcon } from '@radix-ui/react-icons';
+import { useMutation } from '@tanstack/react-query';
+import type { Session } from 'lucia';
+import { Gavel, Menu, User as UserIcon } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-const Navbar = ({
-  className,
-  session,
-}: {
-  className?: string;
-  session: Session | null;
-}) => {
-  const pathname = usePathname();
+const NAV = [
+  { href: '/new', label: 'List a lot' },
+  { href: '/my-auctions', label: 'My lots' },
+  { href: '/my-bids', label: 'My bids' },
+];
 
+const Navbar = ({ session }: { session: Session | null }) => {
   const router = useRouter();
-  const { mutate: server_Signout } = useMutation({
+
+  const { mutate: signOut, isPending } = useMutation({
     mutationFn: Signout,
     onSuccess: () => {
       router.push('/');
+      // The session lives in a server component, so without a refresh the
+      // navbar would keep rendering as though you were still signed in.
+      router.refresh();
     },
   });
-  const LoginHandler = () => {
-    router.push('/sign-up');
-  };
-  const LogoutHandler = () => {
-    server_Signout();
-  };
-  return (
-    <header
-      className={cn(' py-4 px-10 flex items-center justify-between', className)}
-    >
-      <Link href='/' className='flex items-center gap-2' prefetch={false}>
-        <GavelIcon className='w-6 h-6' />
-        <span className='text-xl font-bold hidden md:block'>BidRealm</span>
-      </Link>
-      {pathname === '/' && (
-        <div className='flex-1 max-w-md mx-6'>
-          <div className='relative'>
-            <Search />
-          </div>
-        </div>
-      )}
 
-      <div className='hidden md:flex items-center gap-4'>
-        {session !== null && (
-          <Link
-            href={'/new'}
-            className='bg-black text-white px-4 py-2 rounded-lg hover:cursor:pointer dark:bg-white dark:text-black hidden md:block'
-          >
-            New Auction
-          </Link>
-        )}
-        <ModeToggle />
-        {!session ? (
-          <Button onClick={() => router.push('/sign-up')}>Sign Up</Button>
-        ) : (
-          <>
+  return (
+    <header className='sticky top-0 z-50 w-full border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70'>
+      <div className='mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-4 md:px-6'>
+        <Link href='/' className='flex items-center gap-2'>
+          <Gavel className='size-5 text-paddle' aria-hidden='true' />
+          <span className='font-display text-lg font-semibold tracking-tight'>
+            BidRealm
+          </span>
+        </Link>
+
+        <nav className='hidden items-center gap-1 md:flex'>
+          {session &&
+            NAV.map((item) => (
+              <Button key={item.href} asChild variant='ghost' size='sm'>
+                <Link href={item.href}>{item.label}</Link>
+              </Button>
+            ))}
+
+          <ModeToggle />
+
+          {session ? (
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <div className='flex items-center justify-center border border-[#98989a] rounded-full dark:border-white size-8'>
-                  <UserIcon className='w-7 h-7 font-light dark:text-white' />
-                </div>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='ml-1 rounded-full'
+                  aria-label='Account'
+                >
+                  <UserIcon className='size-4' />
+                </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuContent align='end'>
+                <DropdownMenuLabel>Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/my-auctions')}>
-                  Manage my Auctions
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/my-bids')}>
-                  Bids
-                </DropdownMenuItem>
+                {NAV.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={LogoutHandler}>
-                  Logout
+                <DropdownMenuItem disabled={isPending} onSelect={() => signOut()}>
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </>
-        )}
-      </div>
-      {/*Mobile Menu*/}
-      <div className='md:hidden'>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant='outline' className='w-full h-full '>
-              <Menu />
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>BidRealm</SheetTitle>
-            </SheetHeader>
+          ) : (
+            <div className='ml-1 flex items-center gap-2'>
+              <Button asChild variant='ghost' size='sm'>
+                <Link href='/sign-in'>Sign in</Link>
+              </Button>
+              <Button asChild size='sm'>
+                <Link href='/sign-up'>Create account</Link>
+              </Button>
+            </div>
+          )}
+        </nav>
 
-            <SheetClose asChild className='h-full pt-10'>
-              <div className='flex flex-col items-center justify-center gap-y-2'>
-                {session !== null && (
-                  <Button variant={'ghost'} onClick={() => router.push('/new')}>
-                    New Auction
-                  </Button>
-                )}
-                {session !== null && (
-                  <Button
-                    variant={'ghost'}
-                    onClick={() => router.push('/my-auctions')}
-                  >
-                    Manage my Auctions
-                  </Button>
+        {/* Mobile */}
+        <div className='md:hidden'>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant='outline' size='icon' aria-label='Open menu'>
+                <Menu className='size-4' />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className='flex flex-col'>
+              <SheetHeader>
+                <SheetTitle className='font-display'>BidRealm</SheetTitle>
+              </SheetHeader>
+
+              {/* Each item closes the sheet. This used to wrap the entire panel
+                  in one SheetClose, so every part of it was a close target. */}
+              <nav className='mt-6 flex flex-col gap-1'>
+                {session &&
+                  NAV.map((item) => (
+                    <SheetClose asChild key={item.href}>
+                      <Link
+                        href={item.href}
+                        className='rounded-md px-3 py-2.5 text-sm hover:bg-accent'
+                      >
+                        {item.label}
+                      </Link>
+                    </SheetClose>
+                  ))}
+
+                {!session && (
+                  <>
+                    <SheetClose asChild>
+                      <Link
+                        href='/sign-in'
+                        className='rounded-md px-3 py-2.5 text-sm hover:bg-accent'
+                      >
+                        Sign in
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link
+                        href='/sign-up'
+                        className='rounded-md px-3 py-2.5 text-sm hover:bg-accent'
+                      >
+                        Create account
+                      </Link>
+                    </SheetClose>
+                  </>
                 )}
 
-                {session !== null && (
-                  <Button
-                    variant={'ghost'}
-                    onClick={() => router.push('/my-bids')}
-                  >
-                    Bids
-                  </Button>
+                {session && (
+                  <SheetClose asChild>
+                    <button
+                      type='button'
+                      className='rounded-md px-3 py-2.5 text-left text-sm hover:bg-accent'
+                      onClick={() => signOut()}
+                    >
+                      Sign out
+                    </button>
+                  </SheetClose>
                 )}
+              </nav>
 
-                {session !== null ? (
-                  <Button variant={'ghost'} onClick={LogoutHandler}>
-                    Logout
-                  </Button>
-                ) : (
-                  <Button variant={'ghost'} onClick={LoginHandler}>
-                    SignUp
-                  </Button>
-                )}
-                <div className='flex-grow'></div>
-                <div className='flex items-center gap-2 mb-9'>
-                  <Link href={'https://github.com/rushikeshg25/bid-turbo'}>
-                    <Button variant='outline'>
-                      <GitHubLogoIcon className='w-5 h-5 mr-2' />
-                      Github
-                    </Button>
+              <div className='mt-auto flex items-center justify-between border-t border-border pt-4'>
+                <Button asChild variant='ghost' size='sm'>
+                  <Link href='https://github.com/rushikeshg25/BidRealm-turbo'>
+                    <GitHubLogoIcon className='mr-2 size-4' />
+                    GitHub
                   </Link>
-                  <ModeToggle />
-                </div>
+                </Button>
+                <ModeToggle />
               </div>
-            </SheetClose>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );

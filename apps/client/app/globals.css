@@ -2,50 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Saleroom terminal: the discipline of an auction house rendered as a live
+ * instrument. Three colours, each earning its meaning from the subject --
+ * paddle red is the only thing you can act on, teal means it is happening now,
+ * brass means the hammer has fallen. Everything else is ink on gallery grey.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Ground and surfaces. --card used to be defined as the same value as
+     * --background in both themes, so every bg-card panel in the app was
+     * invisible; surfaces now have real elevation. */
+    --background: 210 11% 96%;
+    --foreground: 210 17% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 210 17% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 72.22% 50.59%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5% 64.9%;
+    --popover-foreground: 210 17% 9%;
+
+    --secondary: 210 12% 93%;
+    --secondary-foreground: 210 17% 9%;
+    --muted: 210 12% 93%;
+    --muted-foreground: 210 8% 40%;
+    --accent: 210 12% 93%;
+    --accent-foreground: 210 17% 9%;
+
+    --border: 210 10% 89%;
+    --input: 210 10% 89%;
+    --ring: 210 17% 9%;
+
+    /* Ordinary buttons stay quiet so the one red thing on the page reads as
+     * the thing to do. */
+    --primary: 210 17% 9%;
+    --primary-foreground: 210 11% 96%;
+
+    /* The bidding paddle. The only action colour, and the only red: it means
+     * you are committing money or destroying something. */
+    --paddle: 2 70% 41%;
+    --paddle-foreground: 0 0% 100%;
+    --destructive: 2 70% 41%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Live now. */
+    --live: 168 76% 30%;
+    --live-foreground: 0 0% 100%;
+
+    /* The hammer has fallen. */
+    --brass: 39 47% 45%;
+    --brass-foreground: 0 0% 100%;
+
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    /* Warm ink rather than blue-black: the ground of a saleroom at night. */
+    --background: 30 18% 7%;
+    --foreground: 38 24% 93%;
+    --card: 26 14% 10%;
+    --card-foreground: 38 24% 93%;
+    --popover: 26 14% 10%;
+    --popover-foreground: 38 24% 93%;
+
+    --secondary: 37 21% 12%;
+    --secondary-foreground: 38 24% 93%;
+    --muted: 37 21% 12%;
+    --muted-foreground: 36 10% 60%;
+    --accent: 37 21% 12%;
+    --accent-foreground: 38 24% 93%;
+
+    --border: 32 17% 17%;
+    --input: 32 17% 17%;
+    --ring: 38 24% 93%;
+
+    --primary: 38 24% 93%;
+    --primary-foreground: 30 18% 7%;
+
+    --paddle: 4 68% 55%;
+    --paddle-foreground: 30 18% 7%;
+    --destructive: 4 68% 55%;
+    --destructive-foreground: 30 18% 7%;
+
+    --live: 166 59% 45%;
+    --live-foreground: 30 18% 7%;
+
+    --brass: 41 53% 55%;
+    --brass-foreground: 30 18% 7%;
   }
 }
 
@@ -53,13 +94,87 @@
   * {
     @apply border-border;
   }
+
   html {
     @apply scroll-smooth;
   }
+
   body {
-    @apply bg-background text-foreground;
-    /* font-feature-settings: "rlig" 1, "calt" 1; */
+    @apply bg-background text-foreground font-sans antialiased;
     font-synthesis-weight: none;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Every price, clock, lot number and ledger row is set in the mono face with
+   * fixed-width digits, so a ticking countdown does not shift the layout. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* A keyboard user has to be able to see where they are. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* The two moments of motion in the app: a price changing, and a bid landing
+   * in the ledger. Everything else is still. */
+  @keyframes price-flash {
+    0% {
+      background-color: hsl(var(--live) / 0.22);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  @keyframes ledger-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-0.35rem);
+      background-color: hsl(var(--live) / 0.18);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      background-color: transparent;
+    }
+  }
+
+  /* Under five minutes the seconds breathe. Colour still carries the state for
+   * anyone who cannot see the motion. */
+  @keyframes hammer-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .animate-price-flash {
+    animation: price-flash 900ms ease-out;
+  }
+
+  .animate-ledger-enter {
+    animation: ledger-enter 500ms ease-out;
+  }
+
+  .animate-hammer-pulse {
+    animation: hammer-pulse 1s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

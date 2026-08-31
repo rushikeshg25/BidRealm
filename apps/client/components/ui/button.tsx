@@ -18,6 +18,9 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // The bidding paddle. Reserved for committing money -- if it is red,
+        // it costs something.
+        paddle: "bg-paddle text-paddle-foreground hover:bg-paddle/90",
       },
       size: {
         default: "h-10 px-4 py-2",

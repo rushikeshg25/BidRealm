@@ -1,95 +1,90 @@
-"use client";
-import { User } from "lucia";
-import { useRouter } from "next/navigation";
-import React from "react";
-import { Button } from "@/components/ui/button";
-type AuctionT = {
-  id: string;
-  title: string;
-  description: string;
-  startingPrice: number;
-  currentPrice: number;
-  startDate: Date;
-  endDate: Date;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  image: string;
-  categories: string;
-};
+'use client';
 
-const formatMoney = (amount: number) => {
-  if (amount >= 100000 && amount < 10000000) {
-    return `${amount / 1000000}L`;
-  } else if (amount >= 10000 && amount < 100000) {
-    return `${amount / 1000}K`;
-  } else if (amount >= 10000000) {
-    return `${amount / 10000000}cr`;
-  }
-  return `${amount}`;
-};
+import Image from 'next/image';
+import Link from 'next/link';
+import HammerClock from '@/components/HammerClock';
+import { useCountdown } from '@/hooks/useCountdown';
+import { LOT_STATE, lotState } from '@/lib/lot';
+import { cn } from '@/lib/utils';
+import { categoryLabel } from '@/types/categories';
+import { formatMoneyShort } from '@/utils/format';
+import type { AuctionListItem } from '@/actions/GetAuctions';
 
-const AuctionCardComponent = ({
-  user,
-  auction,
-}: {
-  user?: User | null;
-  auction: AuctionT;
-}) => {
-  const router = useRouter();
+/**
+ * A stable reference you could quote to someone, taken from the lot's id.
+ * Not a sequence: the catalogue has no ordering to encode, and inventing one
+ * from an array index would change as you page through.
+ */
+const lotRef = (id: string) => id.slice(-5).toUpperCase();
+
+const AuctionCardComponent = ({ auction }: { auction: AuctionListItem }) => {
+  const state = lotState(auction);
+  const tokens = LOT_STATE[state];
+  const remaining = useCountdown(auction.endDate, state === 'live');
+  const bidCount = auction._count?.bids ?? 0;
+
   return (
-    <div className="relative overflow-hidden rounded-lg bg-background shadow-lg group border border--foreground dark:border--foreground">
-      <div className="p-2">
+    <Link
+      href={`/auction/${auction.id}`}
+      // The card used to be an inert div with a button inside it, so most of it
+      // was not clickable and none of it was reachable by keyboard.
+      className='group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-foreground/25'
+    >
+      {/* The rail makes the grid scannable by state without reading a word. */}
+      <span
+        aria-hidden='true'
+        className={cn('absolute inset-y-0 left-0 w-[3px]', tokens.rail)}
+      />
+
+      <div className='relative aspect-[4/3] w-full overflow-hidden bg-muted'>
         {auction.image ? (
-          <img
+          <Image
             src={auction.image}
-            alt="Auction Item"
-            width={300}
-            height={300}
-            className="w-full h-60  rounded-lg object-cover"
+            alt={auction.title}
+            fill
+            sizes='(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw'
+            className='object-cover transition-transform duration-500 group-hover:scale-[1.02]'
           />
         ) : (
-          <div className=" rounded-md bg-background">
-            <div className="flex h-60 w-full items-center justify-center">
-              <div className="text-muted-foreground">No Image</div>
-            </div>
+          <div className='flex h-full items-center justify-center text-xs text-muted-foreground'>
+            No photo
           </div>
         )}
       </div>
-      <div className="px-4 pt-2 pb-3">
-        <div className="flex items-center justify-between">
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary text-primary-foreground">
-            {auction.categories}
+
+      <div className='flex flex-1 flex-col gap-3 p-4 pl-5'>
+        <div className='flex items-center justify-between gap-2'>
+          <span className='font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground tabular'>
+            Lot {lotRef(auction.id)}
+          </span>
+          <span className='truncate text-[11px] uppercase tracking-[0.12em] text-muted-foreground'>
+            {categoryLabel(auction.category)}
           </span>
         </div>
-        <h3 className="text-lg font-semibold mt-2">{auction.title}</h3>
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-base font-semibold">
-            ₹
-            {new Date(auction.startDate) < new Date() &&
-            new Date(auction.endDate) > new Date()
-              ? auction.currentPrice === 0
-                ? formatMoney(auction.startingPrice)
-                : formatMoney(auction.currentPrice)
-              : formatMoney(auction.startingPrice)}
-          </span>
-          <Button
-            className="dark:bg-card-foreground"
-            size="sm"
-            onClick={() => router.push(`/auction/${auction.id}`)}
-          >
-            {new Date(auction.startDate) < new Date() &&
-            new Date(auction.endDate) > new Date()
-              ? "Place Bid"
-              : new Date(auction.startDate) > new Date() &&
-                  new Date(auction.endDate) > new Date()
-                ? "View(Yet to Start)"
-                : "View(Sold Out)"}
-          </Button>
+
+        <h3 className='line-clamp-2 font-display text-lg font-semibold leading-tight'>
+          {auction.title}
+        </h3>
+
+        <div className='mt-auto flex items-end justify-between gap-3 pt-1'>
+          <div>
+            <div className='text-[11px] uppercase tracking-[0.12em] text-muted-foreground'>
+              {state === 'ended' ? 'Hammer' : bidCount > 0 ? 'Current' : 'Opening'}
+            </div>
+            <div className='font-mono text-xl font-semibold tabular'>
+              {formatMoneyShort(auction.currentPrice)}
+            </div>
+          </div>
+
+          <div className='text-right'>
+            <HammerClock remaining={remaining} state={state} />
+            <div className='text-[11px] text-muted-foreground'>
+              {bidCount === 1 ? '1 bid' : `${bidCount} bids`}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

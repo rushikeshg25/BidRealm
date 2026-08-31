@@ -1,13 +1,10 @@
 {
+  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "target": "es2016",
-    "module": "commonjs",
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "outDir": "./dist"
   },
-  "exclude": ["tsup.config.ts"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }

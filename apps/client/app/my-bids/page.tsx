@@ -1,71 +1,56 @@
-import MyBiddings from '@/components/pages/MyBids';
+import MyBids from '@/components/pages/MyBids';
 import { getAuth } from '@/lib/auth';
+import type { MyBid } from '@/types/lot';
 import prisma from '@repo/db';
+import type { Prisma } from '@prisma/client';
 import { redirect } from 'next/navigation';
 
-type bidsT = {
-  id: string;
-  amount: number;
-  createdAt: Date;
-  userId: string;
-  auctionId: string;
-  auction: {
-    title: string;
-  };
-}[];
+const ORDER: Record<string, Prisma.BidOrderByWithRelationInput> = {
+  title: { auction: { title: 'asc' } },
+  amount: { amount: 'desc' },
+  // Sorted by the auction's creation date before, which is not when the bid
+  // was placed.
+  time: { createdAt: 'desc' },
+};
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: {
-    sortBy: string;
-  };
+  searchParams?: { sortBy?: string };
 }) {
   const { session, user } = await getAuth();
-  if (!session) {
-    redirect('/sign-in');
-  }
+  if (!session) redirect('/sign-in');
 
-  let bids: any;
+  const bids = await prisma.bid.findMany({
+    where: { userId: user.id },
+    orderBy: ORDER[searchParams?.sortBy ?? 'time'] ?? ORDER.time,
+    select: {
+      id: true,
+      amount: true,
+      createdAt: true,
+      auctionId: true,
+      auction: {
+        select: {
+          title: true,
+          status: true,
+          currentPrice: true,
+          startDate: true,
+          endDate: true,
+        },
+      },
+    },
+  });
 
-  if (searchParams?.sortBy === 'title') {
-    bids = await prisma.bid.findMany({
-      where: {
-        userId: user.id,
-      },
-      orderBy: {
-        auction: {
-          title: 'asc',
-        },
-      },
-      include: {
-        auction: {
-          select: {
-            title: true,
-          },
-        },
-      },
-    });
-  } else {
-    bids = await prisma.bid.findMany({
-      where: {
-        userId: user.id,
-      },
-      orderBy: {
-        auction: {
-          createdAt: 'desc',
-        },
-      },
-      include: {
-        auction: {
-          select: {
-            title: true,
-          },
-        },
-      },
-    });
-  }
+  // Serialised for the client component; `any` and a @ts-ignore stood here.
+  const rows: MyBid[] = bids.map((bid) => ({
+    ...bid,
+    createdAt: bid.createdAt.toISOString(),
+    auction: {
+      ...bid.auction,
+      startDate: bid.auction.startDate.toISOString(),
+      endDate: bid.auction.endDate.toISOString(),
+    },
+  }));
 
-  //@ts-ignore
-  return <MyBiddings bids={bids} />;
+  return <MyBids bids={rows} />;
 }

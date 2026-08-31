@@ -1,47 +1,54 @@
+import { notFound } from 'next/navigation';
 import Auction from '@/components/pages/Auction';
 import { getAuth } from '@/lib/auth';
+import type { Lot } from '@/types/lot';
 import prisma from '@repo/db';
-import { AuctionWithBidsWithUsersAndUserT } from '@repo/db/types';
-import Link from 'next/link';
 
-const page = async ({ params }: { params: { id: string } }) => {
+export default async function Page({ params }: { params: { id: string } }) {
   const { user } = await getAuth();
+
+  // Explicit selects: `include: { user: true }` shipped every column of the
+  // User row, hashed password and all, to the browser.
   const auction = await prisma.auction.findUnique({
-    where: {
-      id: params.id,
-    },
-    include: {
+    where: { id: params.id },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      image: true,
+      category: true,
+      status: true,
+      startingPrice: true,
+      currentPrice: true,
+      startDate: true,
+      endDate: true,
+      userId: true,
+      user: { select: { id: true, userName: true } },
       bids: {
-        include: {
-          user: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          createdAt: true,
+          userId: true,
+          auctionId: true,
+          user: { select: { id: true, userName: true } },
         },
       },
-      user: true,
     },
   });
 
-  if (!auction)
-    return (
-      <div className='flex flex-col items-center justify-center text-lg'>
-        Auction not found!{' '}
-        <div>
-          Return to{' '}
-          <Link href={'/'} className='underline underline-offset-2'>
-            Home Page{' '}
-          </Link>
-        </div>
-      </div>
-    );
+  if (!auction) notFound();
 
-  return (
-    <Auction
-      user={user}
-      auction={auction as AuctionWithBidsWithUsersAndUserT}
-    />
-  );
-};
+  const lot: Lot = {
+    ...auction,
+    startDate: auction.startDate.toISOString(),
+    endDate: auction.endDate.toISOString(),
+    bids: auction.bids.map((bid) => ({
+      ...bid,
+      createdAt: bid.createdAt.toISOString(),
+    })),
+  };
 
-export default page;
+  return <Auction viewerId={user?.id ?? null} lot={lot} />;
+}

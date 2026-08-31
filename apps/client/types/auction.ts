@@ -1,64 +1,41 @@
 import { z } from 'zod';
+import { Category } from '@repo/db/types';
 
-export enum AuctionStatus {
-  ACTIVE,
-  ENDED,
-  CANCELLED,
-  INACTIVE,
-}
+/**
+ * "Start now" should not fail validation because a few seconds passed between
+ * picking the time and submitting the form.
+ */
+const START_TOLERANCE_MS = 60_000;
 
 export const Auctionschema = z
   .object({
     title: z
       .string()
-      .min(1, { message: 'Title is required' })
-      .max(50, { message: 'Title is too long' }),
-    description: z.string().min(1, { message: 'Description is required' }),
-    startingPrice: z.number().min(1, { message: 'Starting price is required' }),
-    startDate: z.date().refine((date) => date > new Date(), {
-      message: 'Start value  must be in the future',
+      .trim()
+      .min(1, { message: 'Give the lot a title' })
+      .max(50, { message: 'Keep the title under 50 characters' }),
+    description: z
+      .string()
+      .trim()
+      .min(1, { message: 'Describe what you are listing' })
+      .max(2000, { message: 'Keep the description under 2000 characters' }),
+    startingPrice: z
+      .number({ invalid_type_error: 'Enter a starting price' })
+      .int({ message: 'Enter a whole rupee amount' })
+      .positive({ message: 'Enter a starting price above zero' }),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+    category: z.nativeEnum(Category, {
+      errorMap: () => ({ message: 'Pick a category' }),
     }),
-    endDate: z.date().refine((date) => date > new Date(), {
-      message: 'End value must be in the future',
-    }),
-    Categories: z.string().nonempty({ message: 'Category cannot be Empty' }),
+  })
+  .refine((data) => data.startDate.getTime() >= Date.now() - START_TOLERANCE_MS, {
+    message: 'Bidding cannot open in the past',
+    path: ['startDate'],
   })
   .refine((data) => data.endDate > data.startDate, {
-    message: 'End value must be after start value',
+    message: 'Bidding must close after it opens',
     path: ['endDate'],
   });
 
 export type AuctionT = z.infer<typeof Auctionschema>;
-
-export type bidT = {
-  id: string;
-  amount: number;
-  createdAt: Date;
-  userId: string;
-  auctionId: string;
-};
-
-export type auctionType = {
-  id: string;
-  title: string;
-  description: string;
-  startingPrice: number;
-  currentPrice: number;
-  startDate: Date;
-  endDate: Date;
-  status: 'INACTIVE' | 'ACTIVE ' | 'ENDED';
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  image: string;
-  categories: 'COLLECTABLES' | 'WATCHES' | 'FASHION';
-  bids: bidT[];
-  user: {
-    id: string;
-    userName: string;
-    email: string;
-    hashedPassword: string;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-};
