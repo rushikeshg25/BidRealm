@@ -1,0 +1,18 @@
+{
+  "name": "@repo/ws-auth",
+  "version": "1.0.0",
+  "private": true,
+  "license": "ISC",
+  "description": "Signed short-lived tickets authenticating the WebSocket handshake",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.5.0",
+    "typescript": "^5"
+  }
+}

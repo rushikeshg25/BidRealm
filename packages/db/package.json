@@ -19,7 +19,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./auction-rules": "./src/auction-rules.ts"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",
