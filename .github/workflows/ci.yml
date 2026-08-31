@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# A new push to a PR makes the run in flight irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Nothing in this workflow talks to a real service. These exist because the
+  # Next build instantiates Prisma and validates configuration while collecting
+  # page data, and because AUTH_SECRET has a minimum length.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bidrealm
+  AUTH_SECRET: ci-placeholder-secret-value
+  NEXT_PUBLIC_WS_URL: ws://localhost:8080
+  UPLOADTHING_TOKEN: ci-placeholder-token
+
+jobs:
+  quality:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      # --frozen-lockfile so a PR cannot quietly change dependencies.
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      # Every package's types depend on the generated client, so this comes
+      # before anything that reads them.
+      - name: Generate Prisma client
+        run: yarn --cwd packages/db db:generate
+
+      - name: Lint
+        run: yarn turbo run lint
+
+      - name: Typecheck
+        run: yarn turbo run typecheck
+
+      - name: Test
+        run: yarn turbo run test
+
+      - name: Build
+        run: yarn turbo run build
+
+  database:
+    name: Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bidrealm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn --cwd packages/db db:generate
+
+      # Proves the migration history still applies to an empty database. The
+      # category migration is hand-written SQL, so this is the check that it
+      # keeps working.
+      - name: Apply migrations from scratch
+        working-directory: packages/db
+        run: npx prisma migrate deploy
+
+      - name: Create shadow database
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres \
+            -c "CREATE DATABASE bidrealm_shadow;"
+
+      # Catches a schema.prisma edited without a matching migration -- the drift
+      # that only shows up when someone else runs migrate dev.
+      - name: Check schema matches migrations
+        working-directory: packages/db
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --shadow-database-url postgresql://postgres:postgres@localhost:5432/bidrealm_shadow \
+            --exit-code
+
+      # The seed exercises the schema, the enums and the generated client
+      # together, so a mismatch between them fails here rather than in someone's
+      # local setup.
+      - name: Seed
+        run: yarn --cwd packages/db db:seed
