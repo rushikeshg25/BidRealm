@@ -23,6 +23,11 @@ WHERE "categories" IS NULL
 ALTER TABLE "Auction" RENAME COLUMN "categories" TO "category";
 ALTER TABLE "Auction" ALTER COLUMN "category" TYPE "Category" USING "category"::"Category";
 
+-- An auction opens at its starting price. 0 was a sentinel the UI had to
+-- special-case in three separate places, and it made a 1-rupee bid technically
+-- "above" the current price.
+UPDATE "Auction" SET "currentPrice" = "startingPrice" WHERE "currentPrice" = 0;
+
 -- Money is counted, not measured: Bid.amount was Float while Auction prices were Int.
 -- AlterTable
 ALTER TABLE "Bid" ALTER COLUMN "amount" SET DATA TYPE INTEGER USING ROUND("amount")::INTEGER;

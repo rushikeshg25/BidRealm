@@ -2,21 +2,14 @@
 
 import { getAuth, lucia } from '@/lib/auth';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
-const Signout = async () => {
+const Signout = async (): Promise<void> => {
   const { session } = await getAuth();
+  if (!session) return;
 
-  if (!session) redirect('/sign-in');
-
-  await lucia.invalidateSession(session?.id);
+  await lucia.invalidateSession(session.id);
   const sessionCookie = lucia.createBlankSessionCookie();
-  cookies().set(
-    sessionCookie.name,
-    sessionCookie.value,
-    sessionCookie.attributes
-  );
-  // redirect("/sign-in");
+  cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 };
 
 export default Signout;
