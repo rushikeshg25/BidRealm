@@ -16,14 +16,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^5.15.1",
+    "@prisma/client": "5.19.1",
     "@repo/db": "*",
     "@repo/env": "*",
     "@repo/typescript-config": "*",
     "date-and-time": "^3.3.0",
     "express": "^4.19.2",
     "redis": "^4.6.14",
-    "ws": "^8.17.1"
+    "ws": "^8.17.1",
+    "zod": "^3.23.8",
+    "@repo/ws-auth": "*"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
