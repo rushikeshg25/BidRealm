@@ -152,6 +152,9 @@ export class Auction {
       this.currentPrice = bid.amount;
 
       if (outbid) {
+        // Detached on purpose so the bidder is not kept waiting on Redis, with
+        // an explicit catch so a queue failure cannot become an unhandled
+        // rejection and take the process down.
         void enqueueEmail({
           type: 'outbid',
           to: outbid.email,
@@ -160,7 +163,9 @@ export class Auction {
           auctionTitle,
           newAmount: bid.amount,
           newBidder: bid.user.userName,
-        });
+        }).catch((error) =>
+          console.error('[auction %s] outbid notice failed:', this.auctionId, error)
+        );
       }
 
       return { ok: true, bid };
