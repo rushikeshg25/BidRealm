@@ -22,8 +22,10 @@ vi.mock('./db', async () => {
 });
 vi.mock('./queue', () => ({ enqueueEmail: mocks.enqueueEmail }));
 
-const { Auction } = await import('./Auction');
-const { User } = await import('./User');
+// vi.mock is hoisted above these by the test transform, so plain imports are
+// enough -- and unlike a top-level dynamic import they typecheck under NodeNext.
+import { Auction } from './Auction';
+import { User } from './User';
 
 const OWNER = 'owner_1';
 const BIDDER = 'bidder_1';
@@ -55,19 +57,19 @@ const runningRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  // clearAllMocks clears calls but keeps the implementations set in the factory.
   vi.clearAllMocks();
-  mocks.db.$transaction.mockImplementation(async (fn: never) =>
-    (fn as unknown as (t: typeof mocks.tx) => unknown)(mocks.tx)
-  );
   mocks.tx.auction.findUnique.mockResolvedValue(runningRecord());
   mocks.tx.auction.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.bid.findFirst.mockResolvedValue(null);
-  mocks.tx.bid.create.mockImplementation(async ({ data }: never) => ({
-    id: 'bid_1',
-    createdAt: new Date(),
-    ...(data as object),
-    user: { id: BIDDER, userName: 'asha', email: 'asha@example.com' },
-  }));
+  mocks.tx.bid.create.mockImplementation(
+    async ({ data }: { data: Record<string, unknown> }) => ({
+      id: 'bid_1',
+      createdAt: new Date(),
+      ...data,
+      user: { id: BIDDER, userName: 'asha', email: 'asha@example.com' },
+    })
+  );
 });
 
 describe('Auction.placeBid', () => {

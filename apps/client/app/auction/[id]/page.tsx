@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Auction from '@/components/pages/Auction';
 import { getAuth } from '@/lib/auth';
