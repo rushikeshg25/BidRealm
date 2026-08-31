@@ -5,7 +5,9 @@
     "build": "prisma generate",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -27,6 +29,9 @@
     "@types/node": "^22.5.0",
     "prisma": "^5.18.0",
     "ts-node": "^10.9.2",
-    "tsup": "^8.1.0"
+    "tsup": "^8.1.0",
+    "@repo/eslint-config": "*",
+    "eslint": "^8.57.0",
+    "@repo/typescript-config": "*"
   }
 }

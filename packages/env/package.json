@@ -2,7 +2,8 @@
   "name": "@repo/env",
   "version": "1.0.0",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +19,8 @@
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@types/node": "^22.5.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@repo/eslint-config": "*",
+    "eslint": "^8.57.0"
   }
 }
