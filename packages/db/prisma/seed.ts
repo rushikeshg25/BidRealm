@@ -21,22 +21,26 @@ async function seed() {
         hashedPassword: 'abcdefgh',
       },
     });
-    ITEMS.forEach(async (item) => {
+    // forEach ignores the promises it creates, so the seed used to disconnect
+    // before its writes landed. Sequential await keeps the run deterministic.
+    for (const item of ITEMS) {
       await prisma.auction.create({
         data: {
           title: item.title,
           description: item.description,
           startingPrice: item.startingPrice,
-          currentPrice: item.currentPrice,
+          // An auction opens at its starting price; 0 was a sentinel the UI had
+          // to special-case in three separate places.
+          currentPrice: item.startingPrice,
           startDate: item.startDate,
           endDate: item.endDate,
           status: item.status,
           userId: user.id,
           image: item.image,
-          categories: item.categories,
+          category: item.category,
         },
       });
-    });
+    }
   } catch (error) {
     console.log('Error while seeding', error);
   }
