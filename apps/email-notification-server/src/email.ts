@@ -1,20 +1,4 @@
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const EMAIL_FROM = process.env.EMAIL_FROM;
-
-// Hoisted: this used to be rebuilt for every message, so each notification paid
-// for a fresh SMTP connection.
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST ?? 'smtp.ethereal.email',
-  port: Number(process.env.SMTP_PORT ?? 587),
-  auth: {
-    user: process.env.EMAIL_FROM,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
 
 export type Mail = {
   to: string;
@@ -22,15 +6,37 @@ export type Mail = {
   text: string;
 };
 
+export type MailerConfig = {
+  SMTP_HOST: string;
+  SMTP_PORT: number;
+  EMAIL_FROM: string;
+  EMAIL_PASSWORD: string;
+};
+
 /**
- * The previous signature was (from, to, subject) but every call site passed
- * (from, body, address) -- so the message body was used as the recipient and
- * the recipient's address as the subject, and mailOptions carried no body at
- * all. A named argument makes that class of mistake impossible.
+ * Takes its configuration rather than reading process.env at import time, so
+ * the worker can validate the environment before a transporter is built.
  *
- * Uses the promise API: the callback form resolved the await before the send
- * completed, so failures escaped the caller's try/catch.
+ * The transporter is created once here; it used to be rebuilt for every
+ * message, paying for a fresh SMTP connection per notification.
  */
-export const sendMail = async ({ to, subject, text }: Mail): Promise<void> => {
-  await transporter.sendMail({ from: EMAIL_FROM, to, subject, text });
+export const createMailer = (config: MailerConfig) => {
+  const transporter = nodemailer.createTransport({
+    host: config.SMTP_HOST,
+    port: config.SMTP_PORT,
+    auth: { user: config.EMAIL_FROM, pass: config.EMAIL_PASSWORD },
+  });
+
+  /**
+   * The previous signature was (from, to, subject) but every call site passed
+   * (from, body, address) -- so the body became the recipient and the address
+   * became the subject, and mailOptions carried no body at all. Named arguments
+   * make that class of mistake impossible.
+   *
+   * Uses the promise API: the callback form resolved the caller's await before
+   * the send completed, so failures escaped their try/catch.
+   */
+  return async ({ to, subject, text }: Mail): Promise<void> => {
+    await transporter.sendMail({ from: config.EMAIL_FROM, to, subject, text });
+  };
 };

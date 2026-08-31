@@ -16,10 +16,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@types/nodemailer": "^6.4.15",
     "dotenv": "^16.4.5",
     "nodemailer": "^6.9.14",
-    "redis": "^4.6.14"
+    "redis": "^4.6.14",
+    "@repo/env": "*",
+    "@repo/typescript-config": "*"
   },
   "devDependencies": {
     "@types/nodemailer": "^6.4.15",

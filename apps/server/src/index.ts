@@ -1,21 +1,15 @@
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { verifyTicket } from '@repo/ws-auth';
+import { wsServerEnv } from '@repo/env';
 import { AuctionManager } from './AuctionManager';
 import { User } from './User';
 import { db } from './db';
 import { closeQueue } from './queue';
 
-const PORT = Number(process.env.PORT ?? 8080);
-const AUTH_SECRET = process.env.AUTH_SECRET;
-
-if (!AUTH_SECRET) {
-  console.error(
-    'AUTH_SECRET is not set. It must match the value the Next app signs ' +
-      'WebSocket tickets with, or nobody will be able to bid.'
-  );
-  process.exit(1);
-}
+// Validate before anything else, so a missing AUTH_SECRET is a startup error
+// rather than a socket that silently accepts nobody as a bidder.
+const env = wsServerEnv();
 
 /** Drop sockets that stopped answering, so they cannot linger in an auction. */
 const HEARTBEAT_MS = 30_000;
@@ -23,8 +17,8 @@ const HEARTBEAT_MS = 30_000;
 const app = express();
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-const httpServer = app.listen(PORT, () =>
-  console.log(`[server] listening on :${PORT}`)
+const httpServer = app.listen(env.PORT, () =>
+  console.log(`[server] listening on :${env.PORT}`)
 );
 
 const wss = new WebSocketServer({ server: httpServer });
@@ -48,7 +42,7 @@ wss.on('connection', (ws, req) => {
   // the Next app, which is the only side that can read the session cookie.
   // It used to be read straight off the query string, so anyone could bid as
   // anyone. An unsigned connection is still allowed, as a spectator.
-  const ticket = verifyTicket(url.searchParams.get('ticket'), auctionId, AUTH_SECRET);
+  const ticket = verifyTicket(url.searchParams.get('ticket'), auctionId, env.AUTH_SECRET);
   const user = new User(ws, ticket?.u ?? null, auctionId);
 
   alive.add(ws);

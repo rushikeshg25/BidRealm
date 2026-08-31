@@ -1,8 +1,13 @@
 import { createClient } from 'redis';
 import dotenv from 'dotenv';
-import { sendMail } from './email';
+import { workerEnv } from '@repo/env';
+import { createMailer } from './email';
 
 dotenv.config();
+
+// Fail at boot with a readable message rather than at the first job.
+const env = workerEnv();
+const sendMail = createMailer(env);
 
 const QUEUE = 'emails';
 /** Longest pause between reconnect attempts after Redis goes away. */
@@ -73,12 +78,12 @@ const render = (job: EmailJob): { subject: string; text: string } => {
 };
 
 const client = createClient({
-  password: process.env.REDIS_PASSWORD,
+  password: env.REDIS_PASSWORD,
   socket: {
-    host: process.env.REDIS_HOST,
+    host: env.REDIS_HOST,
     // The port was hardcoded to 17801, so REDIS_PORT was read from the
     // environment, documented in .env.example, and then ignored.
-    port: Number(process.env.REDIS_PORT ?? 6379),
+    port: env.REDIS_PORT,
   },
 });
 
