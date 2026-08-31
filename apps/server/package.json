@@ -9,7 +9,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
+    "lint": "eslint src --ext .ts",
     "test": "vitest run"
   },
   "keywords": [],
@@ -33,6 +33,8 @@
     "@types/ws": "^8.5.10",
     "prisma": "^5.18.0",
     "ts-node": "^10.9.2",
-    "tsup": "^8.1.0"
+    "tsup": "^8.1.0",
+    "@repo/eslint-config": "*",
+    "eslint": "^8.57.0"
   }
 }

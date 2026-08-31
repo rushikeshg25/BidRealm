@@ -9,7 +9,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint src --ext .ts"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +24,8 @@
   },
   "devDependencies": {
     "@types/nodemailer": "^6.4.15",
-    "tsup": "^8.1.0"
+    "tsup": "^8.1.0",
+    "@repo/eslint-config": "*",
+    "eslint": "^8.57.0"
   }
 }
