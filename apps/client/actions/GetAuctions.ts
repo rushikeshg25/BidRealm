@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@repo/db';
-import { AuctionStatus, Category, type AuctionStatusT, type CategoryT } from '@repo/db/types';
+import type { AuctionStatusT, CategoryT } from '@repo/db/types';
 import type { Prisma } from '@prisma/client';
 
 /** Upper bound on page size: `?limit=100000` used to be a free full-table scan. */
@@ -68,5 +68,3 @@ export const getAuctions = async ({
 
   return { auctions, totalCount, totalPages: Math.ceil(totalCount / take) };
 };
-
-export { AuctionStatus, Category };

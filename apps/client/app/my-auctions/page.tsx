@@ -15,7 +15,7 @@ export default async function Page({
     redirect('/sign-in');
   }
   const search = searchParams?.query || '';
-  const Auctions = await prisma.auction.findMany({
+  const auctions = await prisma.auction.findMany({
     where: {
       userId: user.id,
       title: {
@@ -23,10 +23,9 @@ export default async function Page({
         mode: 'insensitive',
       },
     },
-    include: {
-      bids: true,
-    },
+    include: { bids: true },
+    orderBy: { createdAt: 'desc' },
   });
 
-  return <MyAuctions user={user} Auctions={Auctions} />;
+  return <MyAuctions auctions={auctions} />;
 }

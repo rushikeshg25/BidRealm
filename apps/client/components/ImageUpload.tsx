@@ -1,53 +1,50 @@
-"use client";
+'use client';
 
-import { OurFileRouter } from "@/app/api/uploadthing/core";
-import { UploadDropzone } from "@uploadthing/react";
-import Image from "next/image";
-import { Suspense, useState } from "react";
-import toast from "react-hot-toast";
-import { X } from "lucide-react";
+import type { OurFileRouter } from '@/app/api/uploadthing/core';
+import { UploadDropzone } from '@uploadthing/react';
+import { X } from 'lucide-react';
+import Image from 'next/image';
+import toast from 'react-hot-toast';
 
-interface ImageUploadProps {
-  ImageURL: (url: string) => void;
-}
+const ImageUpload = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) => {
+  if (value) {
+    return (
+      <div className='relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-border'>
+        <Image src={value} alt='The photo you uploaded' fill className='object-cover' />
+        <button
+          type='button'
+          aria-label='Remove photo'
+          onClick={() => onChange('')}
+          className='absolute right-2 top-2 rounded-full border border-border bg-background p-1 text-foreground shadow-sm'
+        >
+          <X className='size-4' />
+        </button>
+      </div>
+    );
+  }
 
-export default function ImageUpload({ ImageURL }: ImageUploadProps) {
-  const [imgUrl, setImgUrl] = useState<string>("");
   return (
-    <div className="w-fit ">
-      {imgUrl.length > 0 ? (
-        <Suspense fallback={<div>Loading...</div>}>
-          <div className="relative">
-            <X
-              className="absolute  -top-2 -right-2 cursor-pointer z-10  dark:bg-black bg-white font-bold dark:text-white size-6 rounded-full dark:border-white border-black border-2"
-              onClick={() => setImgUrl("")}
-            />
-            <Image
-              alt="Uploaded image"
-              src={imgUrl}
-              width={300}
-              height={300}
-            ></Image>
-          </div>
-        </Suspense>
-      ) : (
-        <UploadDropzone<OurFileRouter, "imageUploader">
-          className="dark:text-white ut-label:dark:text-white  ut-label:text-black dark:border-dashed dark:border-border ut-button:bg-primary ut-button:dark:bg-primary ut-button:dark:text-black ut-button:hover:cursor-pointer
-"
-          endpoint="imageUploader"
-          onClientUploadComplete={(res) => {
-            if (res && res[0]?.url) {
-              setImgUrl(res[0].url);
-              ImageURL(res[0].url);
-              toast.success("Image uploaded!");
-            }
-          }}
-          onUploadError={(error: Error) => {
-            console.error("Upload error:", error);
-            toast.error("Error uploading image! Try again.");
-          }}
-        />
-      )}
-    </div>
+    <UploadDropzone<OurFileRouter, 'imageUploader'>
+      endpoint='imageUploader'
+      className='ut-label:text-foreground ut-allowed-content:text-muted-foreground ut-button:bg-primary ut-button:text-primary-foreground mt-0 rounded-lg border-dashed border-border bg-card'
+      onClientUploadComplete={(res) => {
+        const url = res?.[0]?.url;
+        if (!url) return;
+        onChange(url);
+        toast.success('Photo added.');
+      }}
+      onUploadError={(error: Error) => {
+        console.error('Upload failed:', error);
+        toast.error('That upload did not go through. Try again.');
+      }}
+    />
   );
-}
+};
+
+export default ImageUpload;

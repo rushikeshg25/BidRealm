@@ -1,328 +1,314 @@
 'use client';
-import { User } from 'lucia';
-import React from 'react';
+
+import { deleteAuction } from '@/actions/DeleteAuction';
+import Search from '@/components/Search';
 import { Button } from '@/components/ui/button';
-import { Ellipsis } from 'lucide-react';
-import date from 'date-and-time';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { mkConfig, generateCsv, download } from 'export-to-csv';
-import { formatMoney } from '@/utils/format';
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
-  TableHeader,
-  TableRow,
-  TableHead,
   TableBody,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
-import { AuctionWithBidsT } from '@repo/db/types';
-import Search from '../Search';
-import toast from 'react-hot-toast';
+import { downloadCsv, toCsv } from '@/lib/csv';
+import { LOT_STATE, lotState, type LotState } from '@/lib/lot';
+import { cn } from '@/lib/utils';
+import { categoryLabel } from '@/types/categories';
+import { formatMoney } from '@/utils/format';
 import { useMutation } from '@tanstack/react-query';
-import { deleteAuction } from '@/actions/DeleteAuction';
+import type { AuctionWithBidsT } from '@repo/db/types';
+import { Download, Ellipsis, Plus } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 
-const MyAuctions = ({
-  user,
-  Auctions,
-}: {
-  user: User;
-  Auctions: AuctionWithBidsT[];
-}) => {
+const TABS: { value: LotState | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'live', label: 'Live' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'ended', label: 'Sold' },
+];
+
+const MyAuctions = ({ auctions }: { auctions: AuctionWithBidsT[] }) => {
   const router = useRouter();
-  const csvConfig = mkConfig({ useKeysAsHeaders: true });
-  const csvDownload = () => {
-    //@ts-ignore
-    const csv = generateCsv(csvConfig)(JSON.stringify([...Auctions]));
-    download(csvConfig)(csv);
-  };
-  const { mutate: server_deleteAuction } = useMutation({
+  const [tab, setTab] = useState<LotState | 'all'>('all');
+
+  const { mutate: withdraw, isPending } = useMutation({
     mutationFn: deleteAuction,
-    onSuccess: () => {
-      toast.success('Auction deleted successfully');
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success('Lot withdrawn.');
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
     },
-    onError: (error) => {
-      toast.error('Error deleting auction');
-    },
+    onError: () => toast.error('Could not withdraw the lot. Try again.'),
   });
 
+  const rows = useMemo(
+    () =>
+      auctions.map((auction) => ({
+        ...auction,
+        state: lotState(auction),
+      })),
+    [auctions]
+  );
+
+  const visible = tab === 'all' ? rows : rows.filter((row) => row.state === tab);
+
+  const exportCsv = () =>
+    downloadCsv(
+      `bidrealm-lots-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(
+        rows.map((row) => ({
+          lot: row.id,
+          title: row.title,
+          category: categoryLabel(row.category),
+          status: LOT_STATE[row.state].label,
+          startingPrice: row.startingPrice,
+          currentPrice: row.currentPrice,
+          bids: row.bids.length,
+          opens: row.startDate,
+          closes: row.endDate,
+        })),
+        [
+          { key: 'lot', header: 'Lot' },
+          { key: 'title', header: 'Title' },
+          { key: 'category', header: 'Category' },
+          { key: 'status', header: 'Status' },
+          { key: 'startingPrice', header: 'Starting price' },
+          { key: 'currentPrice', header: 'Current price' },
+          { key: 'bids', header: 'Bids' },
+          { key: 'opens', header: 'Opens' },
+          { key: 'closes', header: 'Closes' },
+        ]
+      )
+    );
+
   return (
-    <div className='container px-4 py-8 mx-auto sm:px-6 lg:px-8 '>
-      <div className='flex flex-col w-full min-h-screen '>
-        <div className='flex flex-col sm:gap-4 sm:py-4 '>
-          <header className='sticky top-0 z-30 flex items-center gap-4 px-4 border-b h-14 bg-background sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6'>
-            <h1>My Auctions</h1>
-            <div className='relative flex-grow-0 ml-auto md:grow-0'>
-              <Search />
-            </div>
-          </header>
-          <main className='grid items-start flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8'>
-            <Tabs defaultValue='all'>
-              <div className='flex items-center'>
-                <TabsList>
-                  <TabsTrigger value='all'>All</TabsTrigger>
-                  <TabsTrigger value='active'>Active</TabsTrigger>
-                  <TabsTrigger value='draft'>Ended</TabsTrigger>
-                </TabsList>
-                <div className='flex items-center gap-2 ml-auto'>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    className='h-8 gap-1'
-                    onClick={csvDownload}
-                  >
-                    <FileIcon className='h-3.5 w-3.5' />
-                    <span className='sr-only sm:not-sr-only sm:whitespace-nowrap'>
-                      Export
-                    </span>
-                  </Button>
-                  <Button
-                    size='sm'
-                    className='h-8 gap-1'
-                    onClick={() => router.push('/new')}
-                  >
-                    <CirclePlusIcon className='h-3.5 w-3.5' />
-                    <span className='sr-only sm:not-sr-only sm:whitespace-nowrap'>
-                      Add Auction
-                    </span>
-                  </Button>
-                </div>
-              </div>
-              <TabsContent value='all'>
-                <Card x-chunk='dashboard-06-chunk-0'>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className='hidden w-[100px] sm:table-cell'>
-                            <span className='sr-only'>Image</span>
-                          </TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className='hidden md:table-cell'>
-                            Price
-                          </TableHead>
-                          <TableHead className='hidden md:table-cell'>
-                            Total Bids
-                          </TableHead>
-                          <TableHead className='hidden md:table-cell'>
-                            Created at
-                          </TableHead>
-                          <TableHead>
-                            <span className='sr-only'>Actions</span>
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      {Auctions.length === 0 ? (
-                        <TableBody>
-                          <TableRow>
-                            <TableCell colSpan={6}>
-                              No auctions.{' '}
-                              <Link
-                                href='/new'
-                                className='underline underline-offset-2'
-                              >
-                                Create one
-                              </Link>
-                            </TableCell>
-                          </TableRow>{' '}
-                        </TableBody>
-                      ) : (
-                        <TableBody>
-                          {Auctions.map((auction) => (
-                            <TableRow key={auction.id}>
-                              <TableCell className='hidden sm:table-cell'>
-                                {auction.image ? (
-                                  <img
-                                    alt='Product image'
-                                    className='object-cover rounded-md aspect-square'
-                                    height='64'
-                                    src={auction.image}
-                                    width='64'
-                                  />
-                                ) : (
-                                  <div className='rounded-md aspect-square bg-background'>
-                                    <div className='flex items-center justify-center w-full h-full'>
-                                      <div className='text-muted-foreground'>
-                                        No Image
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className='font-medium'>
-                                {auction.title}
-                              </TableCell>
-
-                              <TableCell className='hidden md:table-cell'>
-                                ₹
-                                {auction.currentPrice === 0
-                                  ? formatMoney(auction.startingPrice)
-                                  : formatMoney(auction.currentPrice)}
-                              </TableCell>
-                              <TableCell className='hidden md:table-cell'>
-                                {formatMoney(auction.bids.length)}
-                              </TableCell>
-                              <TableCell className='hidden md:table-cell'>
-                                <>{auction.bids.length}</>
-                              </TableCell>
-                              <TableCell className='hidden md:table-cell'>
-                                {date.format(
-                                  auction.createdAt,
-                                  'YYYY/MM/DD HH:mm:ss'
-                                )}
-                              </TableCell>
-                              <TableCell className='hidden md:table-cell'>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      size='sm'
-                                      variant='outline'
-                                      className='h-8 gap-1'
-                                    >
-                                      <Ellipsis />
-                                      <span className='sr-only sm:not-sr-only sm:whitespace-nowrap'>
-                                        View
-                                      </span>
-                                    </Button>
-                                  </DropdownMenuTrigger>
-
-                                  <DropdownMenuContent>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        router.push(`/auction/${auction.id}`);
-                                      }}
-                                    >
-                                      Go to Auction
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(
-                                          `/auction/${auction.id}`
-                                        );
-                                        toast.success('Copied to clipboard');
-                                      }}
-                                    >
-                                      Copy Link
-                                    </DropdownMenuItem>
-                                    {auction.startDate < new Date() &&
-                                      auction.endDate > new Date() && (
-                                        <DropdownMenuItem
-                                          onClick={() => {
-                                            server_deleteAuction(auction.id);
-                                          }}
-                                        >
-                                          Delete Auction
-                                        </DropdownMenuItem>
-                                      )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      )}
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </main>
+    <div className='mx-auto max-w-[1200px] px-4 py-8 md:px-6'>
+      <header className='mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
+        <div>
+          <p className='font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
+            Consignor
+          </p>
+          <h1 className='mt-1.5 font-display text-3xl font-semibold'>My lots</h1>
         </div>
-      </div>
+        <div className='w-full md:max-w-xs'>
+          <Search placeholder='Search your lots' />
+        </div>
+      </header>
+
+      <Tabs value={tab} onValueChange={(value) => setTab(value as LotState | 'all')}>
+        <div className='flex flex-wrap items-center justify-between gap-3'>
+          {/* The Live and Sold tabs previously had no content at all, so
+              selecting one showed a blank panel. */}
+          <TabsList>
+            {TABS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value}>
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <div className='flex items-center gap-2'>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={exportCsv}
+              disabled={rows.length === 0}
+            >
+              <Download className='mr-1.5 size-3.5' />
+              Export CSV
+            </Button>
+            <Button size='sm' asChild>
+              <Link href='/new'>
+                <Plus className='mr-1.5 size-3.5' />
+                List a lot
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {TABS.map((item) => (
+          <TabsContent key={item.value} value={item.value} className='mt-4'>
+            <div className='overflow-hidden rounded-lg border border-border bg-card'>
+              <div className='overflow-x-auto'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className='w-16'>
+                        <span className='sr-only'>Photo</span>
+                      </TableHead>
+                      <TableHead>Lot</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className='text-right'>Price</TableHead>
+                      <TableHead className='text-right'>Bids</TableHead>
+                      <TableHead className='hidden md:table-cell'>Closes</TableHead>
+                      <TableHead className='w-12'>
+                        <span className='sr-only'>Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {visible.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className='py-12 text-center'>
+                          <p className='text-sm text-muted-foreground'>
+                            {rows.length === 0 ? (
+                              <>
+                                You have not listed anything yet.{' '}
+                                <Link
+                                  href='/new'
+                                  className='underline underline-offset-2'
+                                >
+                                  List your first lot
+                                </Link>
+                                .
+                              </>
+                            ) : (
+                              `Nothing ${item.label.toLowerCase()} right now.`
+                            )}
+                          </p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      visible.map((auction) => {
+                        // Withdrawal used to be offered only while the lot was
+                        // running with live bids on it, and hidden for lots
+                        // that had not opened -- exactly backwards.
+                        const canWithdraw =
+                          auction.state !== 'live' && auction.bids.length === 0;
+
+                        return (
+                          <TableRow key={auction.id}>
+                            <TableCell>
+                              <div className='relative size-12 overflow-hidden rounded-md bg-muted'>
+                                {auction.image && (
+                                  <Image
+                                    src={auction.image}
+                                    alt=''
+                                    fill
+                                    sizes='48px'
+                                    className='object-cover'
+                                  />
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell>
+                              <Link
+                                href={`/auction/${auction.id}`}
+                                className='font-medium hover:underline'
+                              >
+                                {auction.title}
+                              </Link>
+                              <div className='text-xs text-muted-foreground'>
+                                {categoryLabel(auction.category)}
+                              </div>
+                            </TableCell>
+
+                            {/* This column was in the header but never in the
+                                body, so every cell after it sat under the wrong
+                                heading. */}
+                            <TableCell>
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+                                  LOT_STATE[auction.state].chip
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    'size-1.5 rounded-full',
+                                    LOT_STATE[auction.state].dot
+                                  )}
+                                />
+                                {LOT_STATE[auction.state].label}
+                              </span>
+                            </TableCell>
+
+                            <TableCell className='text-right font-mono tabular'>
+                              {formatMoney(auction.currentPrice)}
+                            </TableCell>
+
+                            {/* This used to be run through the money formatter,
+                                so five bids rendered as a price. */}
+                            <TableCell className='text-right font-mono tabular'>
+                              {auction.bids.length}
+                            </TableCell>
+
+                            <TableCell className='hidden font-mono text-xs text-muted-foreground tabular md:table-cell'>
+                              {new Date(auction.endDate).toLocaleString('en-IN', {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })}
+                            </TableCell>
+
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size='icon'
+                                    variant='ghost'
+                                    aria-label={`Actions for ${auction.title}`}
+                                  >
+                                    <Ellipsis className='size-4' />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align='end'>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/auction/${auction.id}`}>
+                                      Open lot
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      navigator.clipboard.writeText(
+                                        `${window.location.origin}/auction/${auction.id}`
+                                      );
+                                      toast.success('Link copied.');
+                                    }}
+                                  >
+                                    Copy link
+                                  </DropdownMenuItem>
+                                  {canWithdraw && (
+                                    <DropdownMenuItem
+                                      disabled={isPending}
+                                      className='text-destructive'
+                                      onSelect={() => withdraw(auction.id)}
+                                    >
+                                      Withdraw lot
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 };
-
-function CirclePlusIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns='http://www.w3.org/2000/svg'
-      width='24'
-      height='24'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-    >
-      <circle cx='12' cy='12' r='10' />
-      <path d='M8 12h8' />
-      <path d='M12 8v8' />
-    </svg>
-  );
-}
-
-function FileIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns='http://www.w3.org/2000/svg'
-      width='24'
-      height='24'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-    >
-      <path d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' />
-      <path d='M14 2v4a2 2 0 0 0 2 2h4' />
-    </svg>
-  );
-}
-
-function MoveHorizontalIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns='http://www.w3.org/2000/svg'
-      width='24'
-      height='24'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-    >
-      <polyline points='18 8 22 12 18 16' />
-      <polyline points='6 8 2 12 6 16' />
-      <line x1='2' x2='22' y1='12' y2='12' />
-    </svg>
-  );
-}
-
-function SearchIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns='http://www.w3.org/2000/svg'
-      width='24'
-      height='24'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-    >
-      <circle cx='11' cy='11' r='8' />
-      <path d='m21 21-4.3-4.3' />
-    </svg>
-  );
-}
 
 export default MyAuctions;

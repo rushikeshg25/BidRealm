@@ -1,192 +1,194 @@
-"use client";
+'use client';
 
-import { createAuction } from "@/actions/CreateAuction";
+import { createAuction } from '@/actions/CreateAuction';
+import ImageUpload from '@/components/ImageUpload';
+import { Button } from '@/components/ui/button';
+import DateTimePickerComponent from '@/components/ui/DateTimePickerComponent';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Auctionschema, AuctionT } from "@/types/auction";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { User } from "lucia";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
-import ImageUpload from "../ImageUpload";
-import { Button } from "../ui/button";
-import DateTimePickerComponent from "../ui/DateTimePickerComponent";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { Textarea } from "../ui/textarea";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Auctionschema, type AuctionT } from '@/types/auction';
+import { CATEGORIES } from '@/types/categories';
+import { formatMoney } from '@/utils/format';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { Controller, useForm } from 'react-hook-form';
+import toast from 'react-hot-toast';
+import { useState } from 'react';
 
-export enum Categories {
-  ART,
-  COLLECTABLES,
-  ELECTRONICS,
-  VEHICLES,
-  WATCHES,
-  FASHION,
-  SHOES,
-}
-const CategoriesArray = [
-  "Art",
-  "Collectables",
-  "Electronics",
-  "Vehicles",
-  "Watches",
-  "Fashion",
-  "Shoes",
-];
+const inAnHour = () => new Date(Date.now() + 60 * 60 * 1000);
+const inAWeek = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-const CreateAuction = ({ user }: { user: User }) => {
+const FieldError = ({ message }: { message?: string }) =>
+  message ? (
+    <p className='mt-1 text-sm text-destructive' role='alert'>
+      {message}
+    </p>
+  ) : null;
+
+const CreateAuction = () => {
   const router = useRouter();
-  const [category, setCategory] = useState<string>("");
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
-  const [imgUrl, setImgUrl] = useState<string>("");
-  const [data, setData] = useState<AuctionT>({
-    title: "",
-    description: "",
-    startingPrice: 0,
-    startDate: new Date(),
-    endDate: new Date(),
-    Categories: "",
-  });
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-  } = useForm<AuctionT>({
+  const [imgUrl, setImgUrl] = useState('');
+
+  /**
+   * One source of truth. The old form kept a second copy of the values in
+   * useState and submitted that, so it posted whatever the previous render had
+   * -- and pushed dates in through setValue from three separate effects.
+   */
+  const form = useForm<AuctionT>({
     resolver: zodResolver(Auctionschema),
-  });
-
-  const { mutate: server_createAuction } = useMutation({
-    mutationFn: async () => {
-      return await createAuction(data, imgUrl, user?.id as string);
-    },
-    onSuccess: (data) => {
-      toast.success("Auction created successfully!");
-      router.push("/my-auctions");
-    },
-    onError: (error) => {
-      console.log("Uploading error", error);
-      toast.error("We couldn't create your auction. Please try again.");
+    defaultValues: {
+      title: '',
+      description: '',
+      startingPrice: undefined,
+      startDate: inAnHour(),
+      endDate: inAWeek(),
     },
   });
 
-  const startDateHandler = (date: Date) => {
-    setStartDate(date);
-    setValue("startDate", date);
-  };
-  const endDateHandler = (date: Date) => {
-    setEndDate(date);
-    setValue("endDate", date);
-  };
-  const ImageURL = (url: string) => {
-    setImgUrl(url);
-  };
+  const { mutate: publish, isPending } = useMutation({
+    mutationFn: (values: AuctionT) => createAuction(values, imgUrl),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success('Lot listed.');
+      router.push(`/auction/${result.id}`);
+      router.refresh();
+    },
+    onError: () => toast.error('Could not list the lot. Try again.'),
+  });
 
-  useEffect(() => {
-    setValue("startDate", startDate);
-  }, [startDate]);
-  useEffect(() => {
-    setValue("endDate", endDate);
-  }, [endDate]);
-  useEffect(() => {
-    setValue("Categories", category);
-  }, [category]);
+  const startingPrice = form.watch('startingPrice');
 
-  const onSubmit = async (data: AuctionT) => {
-    setData(() => data);
-    await server_createAuction();
-  };
   return (
-    <div className="max-w-4xl px-4 py-5 mx-auto mt-10 sm:px-6 lg:px-8 dark:border border rounded-lg mb-10">
-      <h1 className="mb-6 text-3xl font-bold flex items-center justify-center">
-        <>Create New Auction</>
-      </h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 w-full">
-          <div className="grid gap-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input {...register("title")} placeholder="Enter auction title" />
-              {errors.title && (
-                <p className="text-red-500">{errors.title.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register("description")}
-                placeholder="Enter auction description"
-              />
-              {errors.description && (
-                <p className="text-red-500">{errors.description.message}</p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="description">Starting Price</Label>
-              <Input
-                type="number"
-                id="startingPrice"
-                onChange={(e) => {
-                  setValue("startingPrice", Number(e.target.value));
-                }}
-                placeholder="Enter starting Bid price"
-              />
-              {errors.startingPrice && (
-                <p className="text-red-500">{errors.startingPrice.message}</p>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="start-date">Start Date & Time</Label>
-                <DateTimePickerComponent Datehandler={startDateHandler} />
-                {errors.startDate && (
-                  <p className="text-red-500">{errors.startDate.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="end-date">End Date & Time</Label>
-                <DateTimePickerComponent Datehandler={endDateHandler} />
-                {errors.endDate && (
-                  <p className="text-red-500">{errors.endDate.message}</p>
-                )}
-              </div>
-            </div>
-            <div className="w-full flex flex-row items-center justify-between">
-              <Label htmlFor="categories">Select Category</Label>
-              <Select onValueChange={(value) => setCategory(value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent className="w-full">
-                  {CategoriesArray.map((category) => (
-                    <SelectItem value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.Categories && (
-                <p className="text-red-500">{errors.Categories.message}</p>
-              )}
-            </div>
+    <div className='mx-auto max-w-4xl px-4 py-8 md:px-6 lg:py-12'>
+      <header className='mb-8'>
+        <p className='font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
+          New consignment
+        </p>
+        <h1 className='mt-1.5 font-display text-3xl font-semibold'>List a lot</h1>
+        <p className='mt-1 text-sm text-muted-foreground'>
+          Bidding opens and closes automatically at the times you set.
+        </p>
+      </header>
+
+      <form
+        onSubmit={form.handleSubmit((values) => publish(values))}
+        className='grid grid-cols-1 gap-8 md:grid-cols-2'
+      >
+        <div className='space-y-5'>
+          <div>
+            <Label htmlFor='title'>Title</Label>
+            <Input id='title' placeholder='1969 Mustang Mach 1' {...form.register('title')} />
+            <FieldError message={form.formState.errors.title?.message} />
           </div>
-          <div className="grid gap-4 h-full">
-            <div className="flex items-center justify-center h-full">
-              <ImageUpload ImageURL={ImageURL} />
-            </div>
+
+          <div>
+            <Label htmlFor='description'>Description</Label>
+            <Textarea
+              id='description'
+              rows={5}
+              placeholder='Condition, provenance, anything a bidder should know.'
+              {...form.register('description')}
+            />
+            <FieldError message={form.formState.errors.description?.message} />
+          </div>
+
+          <div>
+            <Label htmlFor='startingPrice'>Opening price</Label>
+            <Input
+              id='startingPrice'
+              type='number'
+              inputMode='numeric'
+              min={1}
+              placeholder='10000'
+              className='font-mono tabular'
+              {...form.register('startingPrice', { valueAsNumber: true })}
+            />
+            {Number.isFinite(startingPrice) && startingPrice > 0 && (
+              <p className='mt-1 font-mono text-xs text-muted-foreground tabular'>
+                {formatMoney(startingPrice)}
+              </p>
+            )}
+            <FieldError message={form.formState.errors.startingPrice?.message} />
+          </div>
+
+          <div>
+            <Label htmlFor='category'>Category</Label>
+            <Controller
+              control={form.control}
+              name='category'
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id='category'>
+                    <SelectValue placeholder='Pick a category' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError message={form.formState.errors.category?.message} />
           </div>
         </div>
-        <div className="flex justify-center w-full mt-3">
-          <Button type="submit" className="w-1/3">
-            Publish
+
+        <div className='space-y-5'>
+          <div>
+            <Label>Photo</Label>
+            <ImageUpload value={imgUrl} onChange={setImgUrl} />
+          </div>
+
+          <div>
+            <Label htmlFor='startDate'>Bidding opens</Label>
+            <Controller
+              control={form.control}
+              name='startDate'
+              render={({ field }) => (
+                <DateTimePickerComponent
+                  id='startDate'
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            <FieldError message={form.formState.errors.startDate?.message} />
+          </div>
+
+          <div>
+            <Label htmlFor='endDate'>Bidding closes</Label>
+            <Controller
+              control={form.control}
+              name='endDate'
+              render={({ field }) => (
+                <DateTimePickerComponent
+                  id='endDate'
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            <FieldError message={form.formState.errors.endDate?.message} />
+          </div>
+        </div>
+
+        <div className='md:col-span-2'>
+          <Button type='submit' size='lg' className='w-full' disabled={isPending}>
+            {isPending ? 'Listing…' : 'List the lot'}
           </Button>
         </div>
       </form>

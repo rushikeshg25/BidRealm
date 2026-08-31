@@ -1,105 +1,84 @@
 'use client';
+
 import Signin from '@/actions/auth/Signin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { signInSchema, signInSchemaT } from '@/types/auth';
+import { signInSchema, type signInSchemaT } from '@/types/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { z } from 'zod';
 
 const SignIn = () => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<z.infer<typeof signInSchema>>({
-    resolver: zodResolver(signInSchema),
-  });
+  const router = useRouter();
+  const form = useForm<signInSchemaT>({ resolver: zodResolver(signInSchema) });
 
-  const { mutate: server_Signin } = useMutation({
+  // isPending, not the form's isSubmitting: with a mutation the form finishes
+  // submitting immediately, so the button never actually disabled.
+  const { mutate: signIn, isPending } = useMutation({
     mutationFn: Signin,
-    onSuccess: () => {
-      toast.success('Signed in successfully');
+    onSuccess: (result) => {
+      if (!result.ok) {
+        form.setError('password', { message: result.error });
+        return;
+      }
+      router.push('/');
+      router.refresh();
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: () => toast.error('Could not sign you in. Try again.'),
   });
-
-  const onSubmit = async (Formdata: signInSchemaT) => {
-    try {
-      await server_Signin(Formdata);
-    } catch (error) {
-      toast.error('Error signing up. Try again!');
-    }
-  };
 
   return (
-    <div className='flex items-center justify-center min-h-screen bg-muted dark:bg-background'>
-      <div className='w-full max-w-md p-6 space-y-4 rounded-lg shadow-lg bg-background dark:border '>
-        <div className='text-center'>
-          <h1 className='text-3xl font-bold text-primary dark:text-foreground'>
-            Sign In
-          </h1>
-        </div>
-        <form className='space-y-2' onSubmit={handleSubmit(onSubmit)}>
+    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12'>
+      <div className='w-full max-w-sm rounded-lg border border-border bg-card p-7'>
+        <p className='font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
+          Registration
+        </p>
+        <h1 className='mt-1.5 font-display text-2xl font-semibold'>Sign in</h1>
+
+        <form
+          className='mt-6 space-y-4'
+          onSubmit={form.handleSubmit((values) => signIn(values))}
+        >
           <div>
-            <Label htmlFor='email' className='text-muted-foreground'>
-              Email
-            </Label>
-            <Input
-              type='email'
-              placeholder='Enter your email'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('email')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.email && (
-                <p className='text-sm text-red-500'>{errors.email.message}</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <Label htmlFor='password' className='text-muted-foreground'>
-              Password
-            </Label>
-            <Input
-              type='password'
-              placeholder='Enter your password'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('password')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.password && (
-                <p className='text-sm text-red-500'>
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
+            <Label htmlFor='email'>Email</Label>
+            <Input id='email' type='email' autoComplete='email' {...form.register('email')} />
+            {form.formState.errors.email && (
+              <p className='mt-1 text-sm text-destructive' role='alert'>
+                {form.formState.errors.email.message}
+              </p>
+            )}
           </div>
 
-          <Button
-            type='submit'
-            disabled={isSubmitting}
-            className='w-full px-4 py-2 font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-muted'
-          >
-            Sign In
+          <div>
+            <Label htmlFor='password'>Password</Label>
+            <Input
+              id='password'
+              type='password'
+              autoComplete='current-password'
+              {...form.register('password')}
+            />
+            {form.formState.errors.password && (
+              <p className='mt-1 text-sm text-destructive' role='alert'>
+                {form.formState.errors.password.message}
+              </p>
+            )}
+          </div>
+
+          <Button type='submit' className='w-full' disabled={isPending}>
+            {isPending ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
-        <div className='text-center text-muted-foreground'>
-          Create an account?{' '}
-          <Link
-            href='/sign-up'
-            className='text-primary dark:text-foreground hover:underline'
-            prefetch={false}
-          >
-            Signup
+
+        <p className='mt-5 text-center text-sm text-muted-foreground'>
+          No account yet?{' '}
+          <Link href='/sign-up' className='text-foreground underline underline-offset-2'>
+            Create one
           </Link>
-        </div>
+        </p>
       </div>
     </div>
   );

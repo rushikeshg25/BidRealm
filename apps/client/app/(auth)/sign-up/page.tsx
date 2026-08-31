@@ -1,144 +1,98 @@
 'use client';
+
 import { signUp } from '@/actions/auth/Signup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { signUpSchema, signUpSchemaT } from '@/types/auth';
+import { signUpSchema, type signUpSchemaT } from '@/types/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { z } from 'zod';
+
+const FIELDS = [
+  { name: 'userName', label: 'Username', type: 'text', autoComplete: 'username' },
+  { name: 'email', label: 'Email', type: 'email', autoComplete: 'email' },
+  {
+    name: 'password',
+    label: 'Password',
+    type: 'password',
+    autoComplete: 'new-password',
+    hint: 'At least 8 characters.',
+  },
+  {
+    name: 'confirmPassword',
+    label: 'Confirm password',
+    type: 'password',
+    autoComplete: 'new-password',
+  },
+] as const;
 
 const SignUp = () => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<z.infer<typeof signUpSchema>>({
-    resolver: zodResolver(signUpSchema),
-  });
+  const router = useRouter();
+  const form = useForm<signUpSchemaT>({ resolver: zodResolver(signUpSchema) });
 
-  const { mutate: server_Signup } = useMutation({
+  const { mutate: register, isPending } = useMutation({
     mutationFn: signUp,
-    onSuccess: () => {
-      toast.success('Signup successful');
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      router.push('/');
+      router.refresh();
     },
-    onError: (error) => {
-      toast.error(error.message);
-    },
+    onError: () => toast.error('Could not create your account. Try again.'),
   });
-
-  const onSubmit = async (Formdata: signUpSchemaT) => {
-    try {
-      await server_Signup(Formdata);
-    } catch (error) {
-      console.log(error);
-      toast.error('Error signing up. Try again!');
-    }
-  };
 
   return (
-    <div className='flex items-center justify-center min-h-screen bg-muted dark:bg-background'>
-      <div className='w-full max-w-md p-6 space-y-4 rounded-lg shadow-lg bg-background dark:border'>
-        <div className='text-center'>
-          <h1 className='text-3xl font-bold text-primary dark:text-foreground'>
-            Sign Up
-          </h1>
-          <p className='text-muted-foreground'>
-            Create your account to get started.
-          </p>
-        </div>
-        <form className='space-y-2' onSubmit={handleSubmit(onSubmit)}>
-          <div className='static'>
-            <Label htmlFor='username' className='text-muted-foreground'>
-              Username
-            </Label>
-            <Input
-              type='text'
-              placeholder='Enter your username'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('userName')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.userName && (
-                <p className='text-sm text-red-500'>
-                  {errors.userName.message}
+    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12'>
+      <div className='w-full max-w-sm rounded-lg border border-border bg-card p-7'>
+        <p className='font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
+          Registration
+        </p>
+        <h1 className='mt-1.5 font-display text-2xl font-semibold'>Create an account</h1>
+        <p className='mt-1 text-sm text-muted-foreground'>
+          You need one to bid or to list a lot.
+        </p>
+
+        <form
+          className='mt-6 space-y-4'
+          onSubmit={form.handleSubmit((values) => register(values))}
+        >
+          {FIELDS.map((field) => (
+            <div key={field.name}>
+              <Label htmlFor={field.name}>{field.label}</Label>
+              <Input
+                id={field.name}
+                type={field.type}
+                autoComplete={field.autoComplete}
+                {...form.register(field.name)}
+              />
+              {'hint' in field && !form.formState.errors[field.name] && (
+                <p className='mt-1 text-xs text-muted-foreground'>{field.hint}</p>
+              )}
+              {form.formState.errors[field.name] && (
+                <p className='mt-1 text-sm text-destructive' role='alert'>
+                  {form.formState.errors[field.name]?.message}
                 </p>
               )}
             </div>
-          </div>
-          <div>
-            <Label htmlFor='email' className='text-muted-foreground'>
-              Email
-            </Label>
-            <Input
-              type='email'
-              placeholder='Enter your email'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('email')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.email && (
-                <p className='text-sm text-red-500'>{errors.email.message}</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <Label htmlFor='password' className='text-muted-foreground'>
-              Password
-            </Label>
-            <Input
-              type='password'
-              placeholder='Enter your password'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('password')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.password && (
-                <p className='text-sm text-red-500'>
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-          </div>
-          <div>
-            <Label htmlFor='confirm-password' className='text-muted-foreground'>
-              Confirm Password
-            </Label>
-            <Input
-              type='password'
-              placeholder='Confirm your password'
-              className='w-full px-4 py-2 rounded-md bg-muted dark:bg-card dark:text-primary'
-              {...register('confirmPassword')}
-            />
-            <div className='min-h-[20px]'>
-              {errors.confirmPassword && (
-                <p className='text-sm text-red-500'>
-                  {errors.confirmPassword.message}
-                </p>
-              )}
-            </div>
-          </div>
-          <Button
-            type='submit'
-            disabled={isSubmitting}
-            className='w-full px-4 py-2 font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-muted'
-          >
-            Sign Up
+          ))}
+
+          <Button type='submit' className='w-full' disabled={isPending}>
+            {isPending ? 'Creating…' : 'Create account'}
           </Button>
         </form>
-        <div className='text-center text-muted-foreground'>
-          Already have an account?{' '}
-          <Link
-            href='/sign-in'
-            className='text-primary dark:text-foreground hover:underline'
-            prefetch={false}
-          >
-            Log in
+
+        <p className='mt-5 text-center text-sm text-muted-foreground'>
+          Already registered?{' '}
+          <Link href='/sign-in' className='text-foreground underline underline-offset-2'>
+            Sign in
           </Link>
-        </div>
+        </p>
       </div>
     </div>
   );
