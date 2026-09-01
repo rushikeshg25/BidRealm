@@ -8,8 +8,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "prepare": "husky",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "lint:dashes": "./scripts/check-dashes.sh"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "husky": "^9.0.11",

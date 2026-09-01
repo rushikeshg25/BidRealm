@@ -145,7 +145,7 @@ const Filters = () => {
             }}
           />
           <span className='text-muted-foreground' aria-hidden='true'>
-            -
+            –
           </span>
           <Input
             aria-label='Maximum price'

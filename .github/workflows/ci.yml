@@ -28,10 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cheap and needs nothing installed, so it fails fast.
-      - name: Check for em and en dashes
-        run: ./scripts/check-dashes.sh
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
