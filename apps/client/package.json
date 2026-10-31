@@ -27,7 +27,7 @@
     "@radix-ui/react-tooltip": "^1.4.1",
     "@tanstack/react-query": "^5.105.0",
     "@uploadthing/react": "^7.3.3",
-    "argon2": "^0.44.0",
+    "argon2": "^0.45.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
