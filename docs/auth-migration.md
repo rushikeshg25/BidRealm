@@ -118,3 +118,10 @@ The schema expansion is intentionally retained in the database. Do not run an
 older Prisma migration command against history with the applied auth migration
 removed. Restore that migration file when operating the database, or maintain the
 expanded schema until a separate, reviewed cleanup is safe.
+
+The fifth auth-related commit declares the required build environment variables
+in `turbo.json`. This matters in CI and deployments that inject variables instead
+of loading `.env` files. Keep that commit while Better Auth is active. It was
+verified by building an exported checkout with CI placeholders and no `.env`
+files. Reverting it first can break builds even though local development still
+works, so remove it only after rolling back the application integration.

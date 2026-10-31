@@ -35,5 +35,13 @@
         "^build"
       ]
     }
-  }
+  },
+  "globalEnv": [
+    "DATABASE_URL",
+    "AUTH_SECRET",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "UPLOADTHING_TOKEN",
+    "NEXT_PUBLIC_WS_URL"
+  ]
 }
