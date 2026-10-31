@@ -56,3 +56,31 @@ The Prisma adapter uses transactions. Argon2 verifies existing hashes and hashes
 new passwords with the same library. The session cache is disabled so protected
 server operations read current database session state. Schema/configuration
 commits alone do not switch the application's authentication flow.
+
+## 3. Switch the application
+
+Deploy the schema and configuration before the integration commit. Sign-up,
+sign-in, and sign-out use Better Auth's same-origin HTTP endpoints, including its
+origin, CSRF, and rate-limit middleware. Protected server operations read the
+Better Auth session; the navbar receives only a boolean, never the session token.
+
+Existing Lucia cookies are not accepted. Users must sign in again with their
+existing email and password. New and changed passwords remain readable by the
+legacy implementation through the synchronization triggers.
+
+To roll back the integration, pause authentication traffic, restore the prior
+application version, and invalidate both session sets before resuming traffic.
+Do not revive legacy sessions that predate a Better Auth logout or password
+change. In the target environment, an authorized operator can expire sessions:
+
+```sql
+BEGIN;
+UPDATE "Session" SET "expiresAt" = now() WHERE "expiresAt" > now();
+UPDATE "AuthSession" SET "expiresAt" = now() WHERE "expiresAt" > now();
+COMMIT;
+```
+
+Users sign in again after rollback. Keep the expanded database schema and password
+triggers. Revert auth commits in reverse order; configuration/dependency removal
+must follow application rollback, not precede it. Later application writes remain
+in the database, and no down migration is required.

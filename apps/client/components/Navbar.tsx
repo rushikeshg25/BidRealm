@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/sheet';
 import { GitHubLogoIcon } from '@radix-ui/react-icons';
 import { useMutation } from '@tanstack/react-query';
-import type { Session } from 'lucia';
+import toast from 'react-hot-toast';
 import { Gavel, Menu, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -32,11 +32,12 @@ const NAV = [
   { href: '/my-bids', label: 'My bids' },
 ];
 
-const Navbar = ({ session }: { session: Session | null }) => {
+const Navbar = ({ authenticated }: { authenticated: boolean }) => {
   const router = useRouter();
 
   const { mutate: signOut, isPending } = useMutation({
     mutationFn: Signout,
+    onError: () => toast.error('Could not sign out. Try again.'),
     onSuccess: () => {
       router.push('/');
       // The session lives in a server component, so without a refresh the
@@ -56,7 +57,7 @@ const Navbar = ({ session }: { session: Session | null }) => {
         </Link>
 
         <nav className='hidden items-center gap-1 md:flex'>
-          {session &&
+          {authenticated &&
             NAV.map((item) => (
               <Button key={item.href} asChild variant='ghost' size='sm'>
                 <Link href={item.href}>{item.label}</Link>
@@ -65,7 +66,7 @@ const Navbar = ({ session }: { session: Session | null }) => {
 
           <ModeToggle />
 
-          {session ? (
+          {authenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -119,7 +120,7 @@ const Navbar = ({ session }: { session: Session | null }) => {
               {/* Each item closes the sheet. This used to wrap the entire panel
                   in one SheetClose, so every part of it was a close target. */}
               <nav className='mt-6 flex flex-col gap-1'>
-                {session &&
+                {authenticated &&
                   NAV.map((item) => (
                     <SheetClose asChild key={item.href}>
                       <Link
@@ -131,7 +132,7 @@ const Navbar = ({ session }: { session: Session | null }) => {
                     </SheetClose>
                   ))}
 
-                {!session && (
+                {!authenticated && (
                   <>
                     <SheetClose asChild>
                       <Link
@@ -152,7 +153,7 @@ const Navbar = ({ session }: { session: Session | null }) => {
                   </>
                 )}
 
-                {session && (
+                {authenticated && (
                   <SheetClose asChild>
                     <button
                       type='button'

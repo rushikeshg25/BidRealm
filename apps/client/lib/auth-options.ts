@@ -49,6 +49,8 @@ export const authOptions = {
   account: { modelName: 'authAccount' },
   verification: { modelName: 'authVerification' },
   rateLimit: { enabled: true },
+  // Explicit settings also keep these protections active under NODE_ENV=test.
+  advanced: { disableOriginCheck: false, disableCSRFCheck: false },
   databaseHooks: {
     user: {
       create: { before: async (user) => ({ data: { ...user, name: validateName(user.name) } }) },

@@ -1,15 +1,10 @@
-'use server';
+'use client';
 
-import { getAuth, lucia } from '@/lib/auth';
-import { cookies } from 'next/headers';
+import { authClient } from '@/lib/auth-client';
 
-const Signout = async (): Promise<void> => {
-  const { session } = await getAuth();
-  if (!session) return;
-
-  await lucia.invalidateSession(session.id);
-  const sessionCookie = lucia.createBlankSessionCookie();
-  (await cookies()).set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+const signOut = async (): Promise<void> => {
+  const { error } = await authClient.signOut();
+  if (error) throw new Error('Could not sign out. Try again.');
 };
 
-export default Signout;
+export default signOut;

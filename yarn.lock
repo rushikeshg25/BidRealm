@@ -741,11 +741,6 @@
   resolved "https://registry.yarnpkg.com/@keyv/serialize/-/serialize-1.1.1.tgz#0c01dd3a3483882af7cf3878d4e71d505c81fc4a"
   integrity sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==
 
-"@lucia-auth/adapter-prisma@^4.0.1":
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/@lucia-auth/adapter-prisma/-/adapter-prisma-4.0.1.tgz#8f8aa95bf0ac266fd2fb8ac3dc6dd9faec53342f"
-  integrity sha512-3SztRhj1RAHbbhI/0aB7YC5zl6Z6aktPhkWpn2CHhiB03B9x/+A+M6pqJuAt1usU8PzkjVilgRPhrPymMar66A==
-
 "@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4":
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/@msgpackr-extract/msgpackr-extract-darwin-arm64/-/msgpackr-extract-darwin-arm64-3.0.4.tgz#22619f76a6b10ba78c8b74025b0d9754cad69cc7"
@@ -881,31 +876,6 @@
   version "1.44.0"
   resolved "https://registry.yarnpkg.com/@opentelemetry/semantic-conventions/-/semantic-conventions-1.44.0.tgz#c99123b8f2259fc4ce98d2409aae3c4931c10d1a"
   integrity sha512-E3JkOlMBi3N8OGGkbl7tFyqk2MAS6/lySRZBK3Mu7AzjF1fT8oIChH9ChE48SUWzDn9Kdwta+G/p5LJ4xW4CLQ==
-
-"@oslojs/asn1@1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@oslojs/asn1/-/asn1-1.0.0.tgz#25edb31585b369efdc103e9a1eb822df9c235174"
-  integrity sha512-zw/wn0sj0j0QKbIXfIlnEcTviaCzYOY3V5rAyjR6YtOByFtJiT574+8p9Wlach0lZH9fddD4yb9laEAIl4vXQA==
-  dependencies:
-    "@oslojs/binary" "1.0.0"
-
-"@oslojs/binary@1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@oslojs/binary/-/binary-1.0.0.tgz#3e73f9cef0d06731d2aa528066666ccc00d610d6"
-  integrity sha512-9RCU6OwXU6p67H4NODbuxv2S3eenuQ4/WFLrsq+K/k682xrznH5EVWA7N4VFk9VYVcbFtKqur5YQQZc0ySGhsQ==
-
-"@oslojs/crypto@^1.0.1":
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/@oslojs/crypto/-/crypto-1.0.1.tgz#74cf0d19d9fcda7cf5648cf3188dfeaf1d1b039f"
-  integrity sha512-7n08G8nWjAr/Yu3vu9zzrd0L9XnrJfpMioQcvCMxBIiF5orECHe5/3J0jmXRVvgfqMm/+4oxlQ+Sq39COYLcNQ==
-  dependencies:
-    "@oslojs/asn1" "1.0.0"
-    "@oslojs/binary" "1.0.0"
-
-"@oslojs/encoding@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@oslojs/encoding/-/encoding-1.1.0.tgz#55f3d9a597430a01f2a5ef63c6b42f769f9ce34e"
-  integrity sha512-70wQhgYmndg4GCPxPPxPGevRKqTIJ2Nh4OkiMWmDAVYsTQ+Ta7Sq+rPevXyXGdzr30/qZBnyOalCszoMxlyldQ==
 
 "@oxc-project/types@=0.156.0":
   version "0.156.0"
@@ -4224,14 +4194,6 @@ lru-cache@^5.1.1:
   integrity sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==
   dependencies:
     yallist "^3.0.2"
-
-lucia@^3.2.2:
-  version "3.2.2"
-  resolved "https://registry.yarnpkg.com/lucia/-/lucia-3.2.2.tgz#b6e531687a9ab53e727d96e562d0247337c86071"
-  integrity sha512-P1FlFBGCMPMXu+EGdVD9W4Mjm0DqsusmKgO7Xc33mI5X1bklmsQb0hfzPhXomQr9waWIBDsiOjvr1e6BTaUqpA==
-  dependencies:
-    "@oslojs/crypto" "^1.0.1"
-    "@oslojs/encoding" "^1.1.0"
 
 lucide-react@^1.66.0:
   version "1.66.0"

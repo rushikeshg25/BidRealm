@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { session } = await getAuth();
+  const { user } = await getAuth();
 
   return (
     <html
@@ -54,7 +54,7 @@ export default async function RootLayout({
             disableTransitionOnChange
           >
             <div className='flex min-h-screen flex-col bg-background text-foreground'>
-              <Navbar session={session} />
+              <Navbar authenticated={Boolean(user)} />
               <Toaster
                 position='top-center'
                 toastOptions={{
