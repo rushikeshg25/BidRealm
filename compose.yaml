@@ -1,0 +1,28 @@
+name: bidrealm
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: bidrealm
+      POSTGRES_PASSWORD: bidrealm_local
+      POSTGRES_DB: bidrealm
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidrealm -d bidrealm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    profiles: [email]
+    ports:
+      - "127.0.0.1:63799:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,115 +1,125 @@
-
 # BidRealm
 
-BidRealm is a real-time auction platform built with modern web technologies.
+A real-time auction app with authenticated bidding, auction listings, filters,
+image uploads, and email notifications. Prices are stored as whole rupees.
 
+[Watch the demo](https://github.com/user-attachments/assets/7d8cb7e4-a924-4222-9042-cbdb16295aae)
 
+## Architecture
 
-https://github.com/user-attachments/assets/7d8cb7e4-a924-4222-9042-cbdb16295aae
-
-
-
-## Architecture Overview
-<img width="871" alt="BidRealm Arch" src="https://github.com/user-attachments/assets/58554537-48f1-453a-a895-9fa07cb2c72a">
-
-
-System consists of the following components:
-
-1. **Next Client**: The front-end application built with Next.js.
-2. **Express WS Server**: A WebSocket server handling real-time communication.
-3. **Postgres DB**: The primary database for storing user data, auctions, and bids.
-4. **Message Queue**: A Redis-based queue for handling email notifications.
-5. **Email Notification Worker**: A service responsible for sending email notifications.
-
-## Key Features
-
-- Real-time bidding using WebSockets
-- Auction and bid creation
-- Email notifications for auction events (winning, outbid, auction end)
-- User authentication and session management
-
-## Technologies Used
-
-- Next.js for the client-side application
-- Express.js + `ws` for the WebSocket server
-- PostgreSQL and Prisma ORM for data persistence
-- Redis as the queue between the auction server and the email worker
-- Lucia for authentication, with HMAC-signed tickets authenticating the WebSocket handshake
-- UploadThing for image upload
-- Nodemailer for email
-- Turborepo, Tailwind, shadcn-ui, zod, zustand, react-hot-toast
-- Vitest for tests
-
-## How bidding works
-
-A bid is not a write the browser can make. The flow is:
-
-1. The browser asks the Next app for a **ticket** (`/api/ws-ticket`). Only the
-   Next app can read the Lucia session cookie, so only it can vouch for who you
-   are. The ticket is HMAC-signed with `AUTH_SECRET`, scoped to one auction, and
-   valid for 60 seconds.
-2. The browser opens a socket to the auction server with that ticket. Without
-   one you are still connected, as a spectator: you see every bid, but the
-   server refuses any you send.
-3. A bid is accepted inside a single transaction whose price update is guarded
-   by `currentPrice < amount`. Two simultaneous bids cannot both win, and a late
-   bid can never drag the price back down. The bidder gets an explicit
-   `BID_ACCEPTED` or `BID_REJECTED` with a reason.
-4. A sweep advances auction status straight from the database every 15 seconds,
-   so lots open and close on schedule whether or not anyone is watching. On
-   close it queues the winner and consignor emails to Redis, which the worker
-   drains.
-
-`AUTH_SECRET` must be identical in `apps/client` and `apps/server`, or nobody
-can bid.
-
-## Getting Started
-
-Follow these steps to set up BidRealm for local development:
-
-1. Clone the repository:
-```
-git clone https://github.com/rushikeshg25/BidRealm-turbo.git
-cd BidRealm-turbo
+```text
+Browser → Next.js client → PostgreSQL
+   │          │
+   │    signed bid ticket
+   ↓          │
+WebSocket server → PostgreSQL
+   │
+   └→ Redis email queue → notification worker → SMTP
 ```
 
-2. Install dependencies:
-```
-yarn
+| Directory | Purpose |
+| --- | --- |
+| `apps/client` | Next.js UI, server actions, Lucia sessions, UploadThing endpoint |
+| `apps/server` | Express health endpoint, WebSocket bids, auction lifecycle scheduler |
+| `apps/email-notification-server` | Redis consumer and Nodemailer notifications |
+| `packages/db` | Prisma schema, migrations, client, seed data, auction rules |
+| `packages/ws-auth` | Signed, short-lived WebSocket tickets |
+| `packages/env` | Service environment validation |
+| `packages/eslint-config`, `packages/typescript-config` | Shared development configuration |
+
+The client requests a ticket from `/api/ws-ticket`. The server verifies its
+signature, auction scope, and 60-second expiry. Spectators can watch without a
+ticket, but cannot bid. Bid transactions guard the price update against competing
+bids. A database sweep opens and closes auctions every 15 seconds and queues
+notifications. Redis failures do not prevent bidding; dropped notifications are
+logged and are not retried durably.
+
+## Local setup
+
+Use Node.js 22.12 or newer, Corepack, and Docker Compose. Yarn 1.22.22 is pinned in
+`package.json`. Commands below run from the repository root.
+
+```sh
+git clone https://github.com/rushikeshg25/BidRealm.git
+cd BidRealm
+corepack yarn install --frozen-lockfile
+corepack yarn setup:env
+docker compose up -d --wait postgres
+corepack yarn --cwd packages/db db:generate
+corepack yarn --cwd packages/db prisma migrate deploy
+corepack yarn --cwd packages/db db:seed
+corepack yarn dev:core
 ```
 
-3. Set up environment variables. Copy the `.env.example` in `packages/db` and in
-   each app directory to `.env` and fill them in. Note that `AUTH_SECRET` must be
-   the same value in `apps/client` and `apps/server`, and that the browser reads
-   `NEXT_PUBLIC_WS_URL` -- without the prefix Next never inlines it and the
-   client falls back to localhost.
+`setup:env` creates ignored `.env` files for the client, server, and database. It
+generates one shared `AUTH_SECRET`, keeps existing files, and refuses conflicting
+existing secrets. It does not configure external accounts. The seed is optional;
+it creates sample users and lots. Use a new local database for sample data.
 
-4. Set up the database:
-```
-yarn --cwd packages/db prisma migrate dev
-yarn --cwd packages/db db:generate
-yarn --cwd packages/db db:seed   # optional sample lots
+Open [the app](http://localhost:3000). The WebSocket server listens on port 8080;
+[its health endpoint](http://localhost:8080/health) returns `{"status":"ok"}`.
+This endpoint checks the HTTP process, not database or queue readiness.
+
+Compose exposes PostgreSQL only on `127.0.0.1:54329`, with credentials for local
+development only. Data persists in the `postgres_data` volume. `docker compose
+stop` stops services without deleting data. If you use an existing PostgreSQL
+instance, create a dedicated database and update all three `DATABASE_URL` values.
+
+### Configuration
+
+| Variable | Where | Requirement |
+| --- | --- | --- |
+| `DATABASE_URL` | Client, server, database package | Same PostgreSQL database |
+| `AUTH_SECRET` | Client and server | Same random value, at least 16 characters |
+| `NEXT_PUBLIC_WS_URL` | Client | Browser-accessible socket URL; local default `ws://localhost:8080` |
+| `UPLOADTHING_TOKEN` | Client | Real UploadThing v7 token for image uploads |
+| `PORT` | Server | Defaults to `8080` |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Server and worker | Shared queue; omit `REDIS_HOST` to disable notifications |
+| `SMTP_HOST`, `SMTP_PORT`, `EMAIL_FROM`, `EMAIL_PASSWORD` | Worker | SMTP credentials; sender is also the SMTP username |
+
+UploadThing is required to upload images when creating lots. Browsing seeded lots,
+signing in, and bidding can run without an upload token. Never commit `.env`
+files. Restart services after changing server configuration. Rebuild the client
+when changing `NEXT_PUBLIC_WS_URL`, because Next.js embeds it in browser assets.
+Use HTTPS and `wss://` in production; production session cookies require HTTPS.
+
+### Optional email worker
+
+1. Run `docker compose --profile email up -d redis`.
+2. Copy `apps/email-notification-server/.env.example` to `.env` in that directory.
+3. Set `REDIS_HOST=127.0.0.1` and `REDIS_PORT=63799` in the server and worker files.
+4. Set the worker's SMTP credentials and sender address. Use a test mailbox for development.
+5. Restart with `corepack yarn dev` to run all three apps.
+
+`dev:core` starts only the client and WebSocket server. `dev` also starts the
+worker, which requires Redis and SMTP configuration.
+
+## Development and verification
+
+```sh
+corepack yarn --cwd packages/db db:generate
+corepack yarn lint
+corepack yarn typecheck
+corepack yarn test
+corepack yarn build
 ```
 
-5. Start everything:
-```
-yarn dev
-```
-The client runs on `http://localhost:3000` and the auction server on
-`http://localhost:8080`. The email worker needs Redis; without it bidding still
-works and notifications are skipped.
+Tests cover ticket verification, bid rules, mocked concurrent bids, WebSocket
+message validation, pagination, CSV handling, and formatting. Unit tests do not
+prove database concurrency or external SMTP/UploadThing integration. CI also
+applies migrations to an empty PostgreSQL database, checks schema drift, and
+runs the seed.
 
-## Tests
+To change the schema, edit `packages/db/prisma/schema.prisma`, then run
+`corepack yarn --cwd packages/db prisma migrate dev --name <change>` against a
+local development database. Commit the generated migration with the schema.
+Use `migrate deploy` to apply committed migrations during setup or deployment.
 
-```
-yarn test
-```
-
-Vitest covers the rules where being wrong is a security hole or a wrong price on
-screen: ticket verification, the bid guards and the simultaneous-bid race, frame
-validation, and the money and countdown formatters.
+Build before running `corepack yarn workspace client start` and
+`corepack yarn workspace server start`. Keep each service's environment
+configured. Deployment infrastructure and production credentials are not included.
 
 ## Contributing
 
-We welcome contributions to Bid Realm!.Please follow the getting started guide to get started. Please leave a Star ⭐
-
+Keep changes focused, run the checks above, and include any configuration or
+migration steps in the pull request. Do not commit credentials or generated builds.
