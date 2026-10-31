@@ -17,7 +17,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^6.19.3",
+    "@prisma/client": "^7.10.1",
     "dotenv": "^16.6.1"
   },
   "exports": {
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "prisma": "^6.19.3",
+    "prisma": "^7.10.1",
     "ts-node": "^10.9.2",
     "tsup": "^9.0.0",
     "@repo/eslint-config": "*",
