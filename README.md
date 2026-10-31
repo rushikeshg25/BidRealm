@@ -67,6 +67,10 @@ development only. Data persists in the `postgres_data` volume. `docker compose
 stop` stops services without deleting data. If you use an existing PostgreSQL
 instance, create a dedicated database and update all three `DATABASE_URL` values.
 
+For agent-assisted Docker setup, use the repository skill
+[`bidrealm-docker-setup`](.agents/skills/bidrealm-docker-setup/SKILL.md).
+It runs PostgreSQL and optional Redis in Docker while the apps run on the host.
+
 ### Configuration
 
 | Variable | Where | Requirement |
