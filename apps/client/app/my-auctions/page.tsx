@@ -4,12 +4,13 @@ import prisma from '@repo/db';
 import { redirect } from 'next/navigation';
 
 export default async function Page({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     query?: string;
-  };
+  }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { session, user } = await getAuth();
   if (!session) {
     redirect('/sign-in');

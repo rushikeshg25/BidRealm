@@ -4,13 +4,13 @@ import { getAuth } from '@/lib/auth';
 import type { Lot } from '@/types/lot';
 import prisma from '@repo/db';
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { user } = await getAuth();
 
   // Explicit selects: `include: { user: true }` shipped every column of the
   // User row, hashed password and all, to the browser.
   const auction = await prisma.auction.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
     select: {
       id: true,
       title: true,

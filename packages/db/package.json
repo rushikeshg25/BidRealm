@@ -6,7 +6,7 @@
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "prisma": {
@@ -17,8 +17,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "5.19.1",
-    "dotenv": "^16.4.5"
+    "@prisma/client": "^6.19.3",
+    "dotenv": "^16.6.1"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -26,12 +26,12 @@
     "./auction-rules": "./src/auction-rules.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.5.0",
-    "prisma": "^5.18.0",
+    "@types/node": "^24.19.2",
+    "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
-    "tsup": "^8.1.0",
+    "tsup": "^9.0.0",
     "@repo/eslint-config": "*",
-    "eslint": "^8.57.0",
+    "eslint": "^10.14.0",
     "@repo/typescript-config": "*"
   }
 }

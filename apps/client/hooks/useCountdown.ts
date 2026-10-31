@@ -13,20 +13,20 @@ export const useCountdown = (endDate: Date | string, enabled = true) => {
   const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
-      setRemaining(null);
-      return;
-    }
+    if (!enabled) return;
 
-    setRemaining(timeLeft(endDate));
+    const initialTick = setTimeout(() => setRemaining(timeLeft(endDate)), 0);
     const id = setInterval(() => {
       const next = timeLeft(endDate);
       setRemaining(next);
       if (next === 0) clearInterval(id);
     }, 1000);
 
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(initialTick);
+      clearInterval(id);
+    };
   }, [endDate, enabled]);
 
-  return remaining;
+  return enabled ? remaining : null;
 };

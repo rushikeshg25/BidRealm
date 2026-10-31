@@ -36,7 +36,7 @@ logged and are not retried durably.
 
 ## Local setup
 
-Use Node.js 22.12 or newer, Corepack, and Docker Compose. Yarn 1.22.22 is pinned in
+Use Node.js 24.11 or newer (Node 24 LTS is pinned in `.nvmrc`), Corepack, and Docker Compose. Yarn 1.22.22 is pinned in
 `package.json`. Commands below run from the repository root.
 
 ```sh
@@ -102,6 +102,7 @@ corepack yarn lint
 corepack yarn typecheck
 corepack yarn test
 corepack yarn build
+corepack yarn audit
 ```
 
 Tests cover ticket verification, bid rules, mocked concurrent bids, WebSocket
@@ -118,6 +119,18 @@ Use `migrate deploy` to apply committed migrations during setup or deployment.
 Build before running `corepack yarn workspace client start` and
 `corepack yarn workspace server start`. Keep each service's environment
 configured. Deployment infrastructure and production credentials are not included.
+
+## Dependency maintenance
+
+The project uses Next.js 16, React 19, Prisma 6, and Zod 4. Yarn locks exact
+resolved versions. CI audits the dependency tree as well as running quality checks.
+An audit only checks published advisories; it does not guarantee that the app has
+no vulnerabilities. Lucia 3 and its Prisma adapter are deprecated and still need
+a separate authentication migration. Existing sessions and the database schema
+are preserved by this dependency upgrade.
+
+Upgrade references: [Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16),
+[Zod 4](https://zod.dev/v4/changelog), and [Lucia migration](https://lucia-auth.com/lucia-v3/migrate).
 
 ## Contributing
 

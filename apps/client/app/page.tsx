@@ -18,17 +18,18 @@ const toNumber = (value?: string) => {
 };
 
 export default async function Page({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     query?: string;
     page?: string;
     min?: string;
     max?: string;
     s?: string;
     categories?: string;
-  };
+  }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const search = searchParams?.query || undefined;
   const currentPage = Math.max(Number(searchParams?.page) || 1, 1);
 

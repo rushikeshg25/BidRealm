@@ -20,13 +20,13 @@ export const Auctionschema = z
       .min(1, { message: 'Describe what you are listing' })
       .max(2000, { message: 'Keep the description under 2000 characters' }),
     startingPrice: z
-      .number({ invalid_type_error: 'Enter a starting price' })
+      .number({ error: 'Enter a starting price' })
       .int({ message: 'Enter a whole rupee amount' })
       .positive({ message: 'Enter a starting price above zero' }),
-    startDate: z.coerce.date(),
-    endDate: z.coerce.date(),
+    startDate: z.coerce.date<Date>(),
+    endDate: z.coerce.date<Date>(),
     category: z.nativeEnum(Category, {
-      errorMap: () => ({ message: 'Pick a category' }),
+      error: 'Pick a category',
     }),
   })
   .refine((data) => data.startDate.getTime() >= Date.now() - START_TOLERANCE_MS, {

@@ -20,7 +20,7 @@ import { formatMoney } from '@/utils/format';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
 
@@ -68,7 +68,7 @@ const CreateAuction = () => {
     onError: () => toast.error('Could not list the lot. Try again.'),
   });
 
-  const startingPrice = form.watch('startingPrice');
+  const startingPrice = useWatch({ control: form.control, name: 'startingPrice' });
 
   return (
     <div className='mx-auto max-w-4xl px-4 py-8 md:px-6 lg:py-12'>

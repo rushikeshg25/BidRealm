@@ -48,7 +48,9 @@ export const useAuctionSocket = ({
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const socketRef = useRef<WebSocket | null>(null);
   const handlerRef = useRef(onMessage);
-  handlerRef.current = onMessage;
+  useEffect(() => {
+    handlerRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     let cancelled = false;

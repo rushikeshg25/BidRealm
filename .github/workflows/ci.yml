@@ -30,12 +30,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: yarn
+          node-version-file: '.nvmrc'
+
+      - name: Enable Yarn
+        run: corepack enable
 
       # --frozen-lockfile so a PR cannot quietly change dependencies.
       - name: Install
         run: yarn install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: yarn audit
 
       - name: Cache turbo
         uses: actions/cache@v4
@@ -86,8 +91,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: yarn
+          node-version-file: '.nvmrc'
+
+      - name: Enable Yarn
+        run: corepack enable
 
       - name: Install
         run: yarn install --frozen-lockfile

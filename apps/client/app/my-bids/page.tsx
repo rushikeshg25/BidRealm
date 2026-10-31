@@ -14,10 +14,11 @@ const ORDER: Record<string, Prisma.BidOrderByWithRelationInput> = {
 };
 
 export default async function Page({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { sortBy?: string };
+  searchParams?: Promise<{ sortBy?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { session, user } = await getAuth();
   if (!session) redirect('/sign-in');
 

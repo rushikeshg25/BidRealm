@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,7 +39,7 @@ const BidDialog = ({
    */
   const schema = z.object({
     amount: z.coerce
-      .number({ invalid_type_error: 'Enter an amount' })
+      .number<number>({ error: 'Enter an amount' })
       .int('Bid in whole rupees')
       .min(minimumBid, `The next bid has to be at least ${formatMoney(minimumBid)}`),
   });
@@ -54,7 +54,7 @@ const BidDialog = ({
     if (!open) form.reset({ amount: minimumBid });
   }, [minimumBid, open, form]);
 
-  const amount = form.watch('amount');
+  const amount = useWatch({ control: form.control, name: 'amount' });
   const step = bidIncrement(minimumBid);
 
   const onSubmit = ({ amount }: { amount: number }) => {

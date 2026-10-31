@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -57,10 +57,13 @@ const Filters = () => {
   const [min, setMin] = useState(searchParams.get('min') ?? '');
   const [max, setMax] = useState(searchParams.get('max') ?? '');
 
-  useEffect(() => {
+  const query = searchParams.toString();
+  const [previousQuery, setPreviousQuery] = useState(query);
+  if (query !== previousQuery) {
+    setPreviousQuery(query);
     setMin(searchParams.get('min') ?? '');
     setMax(searchParams.get('max') ?? '');
-  }, [searchParams]);
+  }
 
   const pushPrice = useDebouncedCallback((key: 'min' | 'max', value: string) => {
     push((params) => (value ? params.set(key, value) : params.delete(key)));

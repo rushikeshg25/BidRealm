@@ -35,7 +35,7 @@ const Signin = async (formData: unknown): Promise<AuthResult> => {
 
     const session = await lucia.createSession(user.id, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
-    cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
+    (await cookies()).set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
     return { ok: true };
   } catch (error) {

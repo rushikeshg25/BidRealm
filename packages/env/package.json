@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "Per-service environment validation",
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -18,9 +18,9 @@
   "private": true,
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "^22.5.0",
-    "typescript": "^5",
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3",
     "@repo/eslint-config": "*",
-    "eslint": "^8.57.0"
+    "eslint": "^10.14.0"
   }
 }
