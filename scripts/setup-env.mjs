@@ -21,7 +21,8 @@ for (const service of services) {
     continue;
   }
   const template = readFileSync(new URL(`${service}/.env.example`, root), 'utf8');
-  writeFileSync(destination, template.replace(/^AUTH_SECRET=$/m, `AUTH_SECRET=${secret}`), {
+  writeFileSync(destination, template.replace(/^AUTH_SECRET=$/m, `AUTH_SECRET=${secret}`)
+    .replace(/^BETTER_AUTH_SECRET=$/m, `BETTER_AUTH_SECRET=${randomBytes(32).toString('hex')}`), {
     flag: 'wx', mode: 0o600,
   });
   console.log(`Created ${fileURLToPath(destination)}`);

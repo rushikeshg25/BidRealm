@@ -48,7 +48,10 @@
     "zod": "^4.6.7",
     "zustand": "^4.5.7",
     "@repo/ws-auth": "*",
-    "@repo/db": "*"
+    "@repo/db": "*",
+    "better-auth": "^1.7.14",
+    "@better-auth/prisma-adapter": "^1.7.14",
+    "@repo/env": "*"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",

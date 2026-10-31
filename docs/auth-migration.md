@@ -44,3 +44,15 @@ and cannot sign in until their passwords are replaced through a supported flow.
 For an application rollback, leave the additive schema and synchronization
 triggers in place. Do not delete migrations or drop auth tables from a database
 that has received writes. A Git revert does not reverse an applied SQL migration.
+
+## 2. Configure Better Auth
+
+Set `BETTER_AUTH_SECRET` to a random value of at least 32 characters, and set
+`BETTER_AUTH_URL` to the application's exact HTTP(S) origin. Keep the existing
+`AUTH_SECRET` for WebSocket tickets. Use separate secrets for these purposes.
+New local setups generate both secrets; existing `.env` files are left intact.
+
+The Prisma adapter uses transactions. Argon2 verifies existing hashes and hashes
+new passwords with the same library. The session cache is disabled so protected
+server operations read current database session state. Schema/configuration
+commits alone do not switch the application's authentication flow.

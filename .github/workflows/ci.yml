@@ -16,6 +16,8 @@ env:
   # page data, and because AUTH_SECRET has a minimum length.
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bidrealm
   AUTH_SECRET: ci-placeholder-secret-value
+  BETTER_AUTH_SECRET: ci-placeholder-better-auth-secret-at-least-32-characters
+  BETTER_AUTH_URL: http://localhost:3000
   NEXT_PUBLIC_WS_URL: ws://localhost:8080
   UPLOADTHING_TOKEN: ci-placeholder-token
 

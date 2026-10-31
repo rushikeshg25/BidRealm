@@ -64,3 +64,14 @@ export const nextServerEnv = () =>
     AUTH_SECRET: z.string().min(16, 'must be at least 16 characters'),
     UPLOADTHING_TOKEN: z.string().min(1),
   });
+
+/** Better Auth needs an explicit origin and a separate cookie-signing secret. */
+export const authEnv = () =>
+  parse('Better Auth', {
+    BETTER_AUTH_SECRET: z.string().min(32, 'must be at least 32 characters'),
+    BETTER_AUTH_URL: z.url().refine((value) => {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password &&
+        url.pathname === '/' && !url.search && !url.hash;
+    }, 'must be an HTTP(S) origin without a path or credentials'),
+  });

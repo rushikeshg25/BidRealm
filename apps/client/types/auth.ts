@@ -7,13 +7,11 @@ const password = z
   .min(8, 'Use at least 8 characters')
   .max(50, 'Keep it under 50 characters');
 
+export const userNameSchema = z.string().trim().min(1, 'Pick a username').max(50, 'Keep it under 50 characters');
+
 export const signUpSchema = z
   .object({
-    userName: z
-      .string()
-      .trim()
-      .min(1, 'Pick a username')
-      .max(50, 'Keep it under 50 characters'),
+    userName: userNameSchema,
     email: z.string().trim().min(1, 'Enter your email').email('That is not a valid email'),
     password,
     confirmPassword: z.string(),
