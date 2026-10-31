@@ -8,13 +8,17 @@ datasource db {
 }
 
 model User {
-  id             String    @id
+  id             String        @id
   sessions       Session[]
-  userName       String    @unique
-  email          String    @unique
-  hashedPassword String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  authSessions   AuthSession[]
+  accounts       AuthAccount[]
+  emailVerified  Boolean       @default(false)
+  image          String?
+  userName       String        @unique
+  email          String        @unique
+  hashedPassword String        @default("")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
   auctions       Auction[]
   bids           Bid[]
 }
@@ -84,4 +88,51 @@ enum Category {
   FASHION
   SHOES
   MISCELLANEOUS
+}
+
+// Separate sessions allow the application switch to be reverted without
+// changing Lucia's existing Session table.
+model AuthSession {
+  id        String   @id
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  password              String?
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
