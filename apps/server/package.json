@@ -22,7 +22,7 @@
     "@repo/env": "*",
     "@repo/typescript-config": "*",
     "express": "^4.22.3",
-    "redis": "^4.7.1",
+    "redis": "^6.3.0",
     "ws": "^8.22.1",
     "zod": "^4.6.7",
     "@repo/ws-auth": "*"
