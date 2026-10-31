@@ -21,14 +21,14 @@
     "@repo/db": "*",
     "@repo/env": "*",
     "@repo/typescript-config": "*",
-    "express": "^4.22.3",
+    "express": "^5.3.0",
     "redis": "^6.3.0",
     "ws": "^8.22.1",
     "zod": "^4.6.7",
     "@repo/ws-auth": "*"
   },
   "devDependencies": {
-    "@types/express": "^4.17.25",
+    "@types/express": "^5.0.6",
     "@types/ws": "^8.18.2",
     "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
