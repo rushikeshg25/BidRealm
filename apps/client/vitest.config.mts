@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.next/**'],
+    exclude: ['**/*.integration.test.ts', '**/node_modules/**', '**/dist/**', '**/.next/**'],
   },
 });

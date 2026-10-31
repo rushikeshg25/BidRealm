@@ -19,7 +19,7 @@ WebSocket server → PostgreSQL
 
 | Directory | Purpose |
 | --- | --- |
-| `apps/client` | Next.js UI, server actions, Lucia sessions, UploadThing endpoint |
+| `apps/client` | Next.js UI, server actions, Better Auth sessions, UploadThing endpoint |
 | `apps/server` | Express health endpoint, WebSocket bids, auction lifecycle scheduler |
 | `apps/email-notification-server` | Redis consumer and Nodemailer notifications |
 | `packages/db` | Prisma schema, migrations, client, seed data, auction rules |
@@ -36,8 +36,8 @@ logged and are not retried durably.
 
 ## Local setup
 
-Use Node.js 24.11 or newer (Node 24 LTS is pinned in `.nvmrc`), Corepack, and Docker Compose. Yarn 1.22.22 is pinned in
-`package.json`. Commands below run from the repository root.
+Use Node.js 24.11 or newer (Node 24 LTS is pinned in `.nvmrc`), Corepack,
+and Docker Compose. Yarn 1.22.22 is pinned in `package.json`. Commands below run from the repository root.
 
 ```sh
 git clone https://github.com/rushikeshg25/BidRealm.git
@@ -52,9 +52,11 @@ corepack yarn dev:core
 ```
 
 `setup:env` creates ignored `.env` files for the client, server, and database. It
-generates one shared `AUTH_SECRET`, keeps existing files, and refuses conflicting
-existing secrets. It does not configure external accounts. The seed is optional;
-it creates sample users and lots. Use a new local database for sample data.
+generates a shared WebSocket `AUTH_SECRET` and a separate `BETTER_AUTH_SECRET`.
+It keeps existing files and refuses conflicting WebSocket secrets. It does not configure external accounts. The seed is optional;
+it creates sample users and lots. Register your own account to bid; historical
+seed users have placeholder passwords and cannot sign in. Use a new local
+database for sample data.
 
 Open [the app](http://localhost:3000). The WebSocket server listens on port 8080;
 [its health endpoint](http://localhost:8080/health) returns `{"status":"ok"}`.
@@ -70,7 +72,9 @@ instance, create a dedicated database and update all three `DATABASE_URL` values
 | Variable | Where | Requirement |
 | --- | --- | --- |
 | `DATABASE_URL` | Client, server, database package | Same PostgreSQL database |
-| `AUTH_SECRET` | Client and server | Same random value, at least 16 characters |
+| `AUTH_SECRET` | Client and server | Same random value, at least 16 characters; signs WebSocket tickets |
+| `BETTER_AUTH_SECRET` | Client | Separate random secret of at least 32 characters; signs auth cookies |
+| `BETTER_AUTH_URL` | Client | Exact application origin, such as `http://localhost:3000` |
 | `NEXT_PUBLIC_WS_URL` | Client | Browser-accessible socket URL; local default `ws://localhost:8080` |
 | `UPLOADTHING_TOKEN` | Client | Real UploadThing v7 token for image uploads |
 | `PORT` | Server | Defaults to `8080` |
@@ -120,17 +124,36 @@ Build before running `corepack yarn workspace client start` and
 `corepack yarn workspace server start`. Keep each service's environment
 configured. Deployment infrastructure and production credentials are not included.
 
+### Authentication integration tests
+
+These tests use real PostgreSQL, Argon2, and Better Auth HTTP middleware. They
+cover legacy credentials, registration, session revocation, cookie rejection,
+password synchronization, validation, origin checks, and rate limiting.
+
+```sh
+docker compose exec -T postgres createdb -U bidrealm bidrealm_auth_test
+AUTH_TEST_DATABASE_URL=postgresql://bidrealm:bidrealm_local@127.0.0.1:54329/bidrealm_auth_test corepack yarn test:auth
+```
+
+Create the test database once. The runner requires a local database whose name
+ends in `_auth_test`, applies migrations, and removes only its generated users.
+The normal `test` command does not need a running database.
+
+For existing deployments, follow [the auth migration and rollback guide](docs/auth-migration.md).
+The migration preserves accounts and Argon2 passwords. Users must sign in again;
+Lucia session cookies are not accepted by Better Auth.
+
 ## Dependency maintenance
 
 The project uses Next.js 16, React 19, Prisma 6, and Zod 4. Yarn locks exact
 resolved versions. CI audits the dependency tree as well as running quality checks.
 An audit only checks published advisories; it does not guarantee that the app has
-no vulnerabilities. Lucia 3 and its Prisma adapter are deprecated and still need
-a separate authentication migration. Existing sessions and the database schema
-are preserved by this dependency upgrade.
+no vulnerabilities. Better Auth replaces the deprecated Lucia packages. The
+Effect resolution in `package.json` updates UploadThing's pinned transitive
+dependency to a patched release; keep it until upstream no longer needs it.
 
 Upgrade references: [Next.js 16](https://nextjs.org/docs/app/guides/upgrading/version-16),
-[Zod 4](https://zod.dev/v4/changelog), and [Lucia migration](https://lucia-auth.com/lucia-v3/migrate).
+[Zod 4](https://zod.dev/v4/changelog), and [Better Auth with Next.js](https://better-auth.com/docs/integrations/next).
 
 ## Contributing
 

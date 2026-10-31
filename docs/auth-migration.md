@@ -84,3 +84,37 @@ Users sign in again after rollback. Keep the expanded database schema and passwo
 triggers. Revert auth commits in reverse order; configuration/dependency removal
 must follow application rollback, not precede it. Later application writes remain
 in the database, and no down migration is required.
+
+## 4. Verify and operate
+
+Run `yarn test:auth` with a dedicated local `AUTH_TEST_DATABASE_URL` whose database
+name ends in `_auth_test`. The suite applies migrations and exercises the real
+HTTP handler and PostgreSQL adapter. It checks legacy Argon2 login, registration,
+session revocation, expired/forged/legacy cookies, password synchronization in
+both directions, duplicate usernames, invalid input, origin rejection, and rate
+limiting. Each run removes only users created by that run. CI runs this suite
+against a separate PostgreSQL database.
+
+Local verification also covered the running Next.js app: registration, protected
+page rendering, WebSocket ticket issuance and authenticated handshake, logout,
+and rejection of new tickets from a revoked session. Existing signed WebSocket
+tickets remain valid for their 60-second lifetime; this migration does not add
+immediate revocation to already-open auction sockets.
+
+The built-in rate limiter uses process-local memory. Before running multiple app
+instances, choose shared rate-limit storage and configure the trusted proxy to
+replace forwarded client-IP headers. No email-verification or password-reset
+mail delivery is configured by this migration. SMTP auction notifications are
+separate from authentication email.
+
+Revert order:
+
+1. Verification/documentation commit, if desired; reverting tests does not undo runtime behavior.
+2. Application integration commit, after the session-expiration procedure above.
+3. Better Auth configuration/dependency commit, once no running version imports it.
+4. Schema source commit only after planning a separate database cleanup. Leave the applied migration and tables intact during rollback.
+
+The schema expansion is intentionally retained in the database. Do not run an
+older Prisma migration command against history with the applied auth migration
+removed. Restore that migration file when operating the database, or maintain the
+expanded schema until a separate, reviewed cleanup is safe.
